@@ -1,0 +1,12 @@
+{
+  "manifest_version": 3,
+  "default_locale": "en",
+  "name": "__MSG_extensionName__",
+  "version": "0.1.0",
+  "description": "__MSG_extensionDescription__",
+  "action": {
+    "default_title": "__MSG_extensionName__",
+    "default_popup": "launcher.html"
+  },
+  "permissions": []
+}
