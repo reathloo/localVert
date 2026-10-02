@@ -1,0 +1,13 @@
+<!doctype html>
+<html lang="en">
+  <meta charset="utf-8">
+  <title>localVert regression checks</title>
+  <h1>localVert regression checks</h1>
+  <p>Run <code>node tests/fixtures.mjs tests/generated</code>, then use the local fixtures button.</p>
+  <button type="button" id="run-generated">Run local fixtures</button>
+  <button type="button" id="choose-fixtures">Choose test fixtures</button>
+  <input type="file" id="fixtures" multiple hidden>
+  <pre id="results" role="status">Waiting for fixtures.</pre>
+  <script src="../vendor/pdf-lib/pdf-lib.min.js"></script>
+  <script type="module" src="regression.js?v=5"></script>
+</html>

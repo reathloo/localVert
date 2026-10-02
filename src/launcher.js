@@ -3,12 +3,12 @@ import { locale, t } from './i18n.js';
 (async () => {
   document.documentElement.lang = locale;
   document.title = t('appName');
-  const api = globalThis.browser ?? globalThis.chrome;
-  const url = api.runtime.getURL('index.html');
   const status = document.querySelector('#status');
   status.textContent = t('opening');
 
   try {
+    const api = globalThis.browser ?? globalThis.chrome;
+    const url = api.runtime.getURL('index.html');
     const windows = await api.windows.getAll({ populate: true });
     const existing = windows.find((item) => item.tabs?.some((tab) => tab.url === url));
     if (existing) {

@@ -3,89 +3,116 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Local Converter</title>
+    <title>localVert</title>
+    <script src="src/theme-init.js"></script>
     <link rel="stylesheet" href="styles.css">
   </head>
   <body>
-    <main class="app">
+    <main id="app" class="app">
       <header>
         <div class="header-top">
-          <div class="eyebrow" data-i18n="eyebrow">PRIVATE · OFFLINE</div>
-          <div class="language-picker">
-            <button id="language-button" class="language-button" type="button" aria-expanded="false" aria-controls="language-menu" aria-label="Language">🌐 <span id="language-current">EN</span> <span aria-hidden="true">▾</span></button>
-            <div id="language-menu" class="language-menu hidden">
-              <button type="button" data-language="auto" data-i18n="autoLanguage">Automatic</button>
-              <button type="button" data-language="en">English</button>
-              <button type="button" data-language="de">Deutsch</button>
-              <button type="button" data-language="es">Español</button>
-              <button type="button" data-language="fr">Français</button>
+          <h1>localVert<span class="brand-dot" aria-hidden="true">.</span></h1>
+          <div class="header-actions">
+            <div class="theme-picker">
+              <button id="theme-button" class="toolbar-button" type="button" aria-expanded="false" aria-controls="theme-menu" aria-label="Color theme">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 14A8.7 8.7 0 0 1 10 3.5 8.7 8.7 0 1 0 20.5 14Z"/></svg>
+              </button>
+              <div id="theme-menu" class="preference-menu" hidden>
+                <button type="button" data-theme="auto" data-i18n="autoTheme">Automatic</button>
+                <button type="button" data-theme="light" data-i18n="lightTheme">Light</button>
+                <button type="button" data-theme="dark" data-i18n="darkTheme">Dark</button>
+              </div>
+            </div>
+            <div class="language-picker">
+              <button id="language-button" class="toolbar-button" type="button" aria-expanded="false" aria-controls="language-menu" aria-label="Language">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c5 5 5 13 0 18-5-5-5-13 0-18Z"/></svg>
+                <span id="language-current">EN</span>
+              </button>
+              <div id="language-menu" class="preference-menu" hidden>
+                <button type="button" data-language="auto" data-i18n="autoLanguage">Automatic</button>
+                <button type="button" data-language="en">English</button>
+                <button type="button" data-language="de">Deutsch</button>
+                <button type="button" data-language="es">Español</button>
+                <button type="button" data-language="fr">Français</button>
+              </div>
             </div>
           </div>
         </div>
-        <h1 data-i18n="appName">Local Converter</h1>
-        <p class="intro" data-i18n="intro">Process images and PDFs without files leaving your device.</p>
+        <p class="intro" data-i18n="intro">Convert and optimize files locally.</p>
       </header>
 
-      <section id="dropzone" class="dropzone" tabindex="0" aria-label="Choose a file" data-i18n-aria-label="chooseFile">
-        <input id="file-input" type="file" accept="image/jpeg,image/png,image/webp,application/pdf">
-        <div class="drop-icon">↥</div>
-        <strong data-i18n="dropFile">Drop a file here</strong>
-        <span data-i18n="orChoose">or click to choose</span>
-        <small data-i18n="supportedFormats">JPG, PNG, WebP and PDF</small>
+      <input id="file-input" type="file" multiple accept="image/jpeg,image/png,image/webp,application/pdf,audio/mpeg,audio/wav,.mp3,.wav,.docx,.xlsx" hidden>
+      <section id="dropzone" class="dropzone" role="button" tabindex="0" aria-label="Choose a file" data-i18n-aria-label="chooseFile">
+        <svg class="drop-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6M8 15h8m-4-4v8"/></svg>
+        <strong id="drop-label">Drop a file here</strong>
+        <span class="drop-help" data-i18n="orChoose">or click to choose</span>
+        <small class="drop-help" data-i18n="supportedFormats">Images, PDF, MP3, WAV, DOCX and XLSX</small>
       </section>
-      <div id="error" class="error hidden" role="alert"></div>
+      <div id="error" class="error" role="alert" hidden></div>
 
-      <section id="workspace" class="workspace hidden">
+      <section id="workspace" hidden>
+        <div id="single-workspace">
         <div class="file-card">
-          <div class="file-kind" id="file-kind">DATEI</div>
-          <div class="file-details">
-            <strong id="file-name">—</strong>
-            <span id="file-size">—</span>
+          <span class="file-kind" id="file-kind"></span>
+          <div class="file-details"><strong id="file-name"></strong><span id="file-size"></span></div>
+          <button id="remove-file" class="icon-button" type="button" title="Remove file" aria-label="Remove file" data-i18n-title="removeFile" data-i18n-aria-label="removeFile">×</button>
+        </div>
+
+        <div class="settings">
+          <div id="format-row" class="control-group format-row">
+            <label for="format" data-i18n="outputFormat">Output format</label>
+            <select id="format"></select>
           </div>
-          <button id="remove-file" class="icon-button" title="Remove file" aria-label="Remove file" data-i18n-title="removeFile" data-i18n-aria-label="removeFile">×</button>
-        </div>
-
-        <div class="control-group">
-          <div class="control-label">
-            <label for="quality" data-i18n="compressionStrength">Compression strength</label>
-            <output id="quality-output" for="quality">Balanced</output>
+          <div id="quality-row" class="control-group">
+            <div class="control-label"><label for="quality" data-i18n="compressionStrength">Compression strength</label><output id="quality-output" for="quality"></output></div>
+            <input id="quality" type="range" min="0" max="90" value="40" aria-describedby="quality-direction quality-status">
+            <div id="quality-direction" class="range-hints"><span data-i18n="gentleHint">Gentle · high quality</span><span data-i18n="strongHint">Strong · lower quality</span></div>
+            <div id="quality-status" class="quality-status" role="status"></div>
           </div>
-          <input id="quality" type="range" min="0" max="90" value="40" aria-describedby="quality-direction quality-status">
-          <div id="quality-direction" class="range-hints"><span data-i18n="gentleHint">Gentle · high quality</span><span data-i18n="strongHint">Strong · lower quality</span></div>
-          <div id="quality-status" class="quality-status quality-good" role="status">Quality: high</div>
+          <div id="target-row" class="control-group" hidden>
+            <label for="target-size" data-i18n="targetSize">Target size (MB, optional)</label>
+            <input id="target-size" type="text" inputmode="decimal" placeholder="e.g. 2.5" data-i18n-placeholder="targetPlaceholder" aria-describedby="target-help">
+            <small id="target-help" class="field-help" data-i18n="targetHelp"></small>
+          </div>
+          <p id="pdf-notice" class="notice" hidden></p>
+          <p id="quality-warning" class="warning" role="status" hidden></p>
+          <div id="estimate" class="estimate" aria-live="polite" hidden></div>
         </div>
+        <div class="process-actions">
+          <button id="process" class="primary-button" type="button" data-i18n="process">Process locally</button>
+          <button id="download" class="primary-button" type="button" data-i18n="download" hidden>Download result</button>
+          <button id="cancel" class="secondary-button" type="button" data-i18n="cancel" hidden>Cancel</button>
+        </div>
+        <p id="download-status" class="download-status" role="status" hidden></p>
+        <p id="progress" class="progress" role="status" hidden></p>
 
-        <div id="format-row" class="control-group">
-          <div class="control-label"><label for="format" data-i18n="outputFormat">Output format</label></div>
-          <select id="format">
-            <option value="image/jpeg">JPEG</option>
-            <option value="image/webp">WebP</option>
-            <option value="image/png" data-i18n="pngLossless">PNG (lossless)</option>
-          </select>
+        <section id="result-panel" class="result-panel" aria-labelledby="result-title" hidden>
+          <div class="result-heading"><h2 id="result-title" data-i18n="result">Result</h2><strong id="result-size"></strong></div>
+          <p id="result-stats" role="status"></p>
+          <div id="preview" class="preview" hidden>
+            <figure><figcaption data-i18n="original">Original</figcaption><img id="original-preview" alt="Original file preview" data-i18n-alt="originalPreview"></figure>
+            <figure><figcaption data-i18n="result">Result</figcaption><img id="result-preview" alt="Result preview" data-i18n-alt="resultPreview"></figure>
+          </div>
+          <p id="preview-error" class="field-help" data-i18n="previewFailed" hidden></p>
+        </section>
         </div>
-
-        <div id="target-row" class="control-group hidden">
-          <div class="control-label"><label for="target-size" data-i18n="targetSize">Target size (MB, optional)</label></div>
-          <input id="target-size" type="number" min="0.1" step="0.1" inputmode="decimal" placeholder="e.g. 2.5" data-i18n-placeholder="targetPlaceholder">
-        </div>
-
-        <div id="pdf-notice" class="notice hidden"></div>
-        <div id="quality-warning" class="quality-warning hidden" role="status"></div>
-        <div id="estimate" class="estimate hidden"></div>
-        <div id="progress" class="estimate hidden" role="status"></div>
-        <div class="actions">
-          <button id="process" class="primary-button" data-i18n="process">Process locally</button>
-          <button id="download" class="secondary-button hidden" data-i18n="download">Download result</button>
-          <div id="download-status" class="download-status hidden" role="status" aria-live="polite"></div>
-        </div>
-        <div id="result-stats" class="result-stats hidden"></div>
-        <div id="preview" class="preview hidden">
-          <div><strong data-i18n="original">Original</strong><img id="original-preview" alt="Original file preview" data-i18n-alt="originalPreview"></div>
-          <div><strong data-i18n="result">Result</strong><img id="result-preview" alt="Result preview" data-i18n-alt="resultPreview"></div>
-        </div>
+        <section id="batch-workspace" class="batch-workspace" aria-labelledby="batch-title" hidden>
+          <div class="batch-heading"><h2 id="batch-title" data-i18n="batchTitle">Files</h2><span id="batch-count"></span></div>
+          <div class="control-group">
+            <div class="control-label"><label for="batch-quality" data-i18n="compressionStrength">Compression strength</label><output id="batch-quality-output" for="batch-quality"></output></div>
+            <input id="batch-quality" type="range" min="0" max="90" value="40" aria-describedby="batch-quality-direction">
+            <div id="batch-quality-direction" class="range-hints"><span data-i18n="gentleHint">Gentle · high quality</span><span data-i18n="strongHint">Strong · lower quality</span></div>
+          </div>
+          <p id="batch-pdf-notice" class="warning" data-i18n="batchPdfNotice" hidden>Strong PDF compression creates image-only pages.</p>
+          <div class="process-actions">
+            <button id="batch-process" class="primary-button" type="button" data-i18n="batchProcess">Process all locally</button>
+            <button id="batch-cancel" class="secondary-button" type="button" data-i18n="cancel" hidden>Cancel</button>
+          </div>
+          <p id="batch-progress" class="progress" role="status" hidden></p>
+          <div id="batch-list" class="batch-list"></div>
+        </section>
       </section>
-
-      <footer><span class="shield">◆</span> <span data-i18n="footer">Processing takes place entirely on your device.</span></footer>
+      <footer><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg><span data-i18n="footer">Files stay on your device.</span></footer>
     </main>
     <script src="vendor/pdf-lib/pdf-lib.min.js"></script>
     <script type="module" src="src/main.js"></script>
