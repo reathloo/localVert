@@ -1,33 +1,97 @@
 import * as pdfjs from '../vendor/pdfjs/pdf.mjs';
 import { t } from './i18n.js';
+import { zipBlobs, MAX_ZIP_BYTES } from './zip.js';
+import { imageBitmap } from './conversion.js';
 
 // These routes intentionally use only browser APIs and the PDF library already
 // shipped with the extension. No input is sent to a service.
-export async function imageToPdf(file, strength, signal) {
+export async function imagesToPdf(files, strength, signal, onProgress = () => {}) {
   signal.throwIfAborted();
-  const bitmap = await createImageBitmap(file);
-  const canvas = document.createElement('canvas');
+  const output = await PDFLib.PDFDocument.create();
+  for (const [index, file] of files.entries()) {
+    signal.throwIfAborted();
+    const bitmap = await imageBitmap(file);
+    const canvas = document.createElement('canvas');
+    try {
+      const limit = strength > 65 ? 1800 : strength > 30 ? 2400 : 3200;
+      const scale = Math.min(1, limit / Math.max(bitmap.width, bitmap.height));
+      canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+      canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+      const context = canvas.getContext('2d', { alpha: false });
+      if (!context) throw new Error(t('canvasMemory'));
+      context.fillStyle = '#fff';
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+      const jpeg = await new Promise((resolve, reject) => canvas.toBlob((blob) => blob?.type === 'image/jpeg' ? resolve(blob) : reject(new Error(t('imageEncodeError'))), 'image/jpeg', (100 - strength) / 100));
+      signal.throwIfAborted();
+      const embedded = await output.embedJpg(await jpeg.arrayBuffer());
+      output.addPage([canvas.width, canvas.height]).drawImage(embedded, { x: 0, y: 0, width: canvas.width, height: canvas.height });
+      onProgress('pageProgress', { page: index + 1, total: files.length });
+    } finally {
+      bitmap.close();
+      canvas.width = canvas.height = 0;
+    }
+  }
+  const bytes = await output.save();
+  signal.throwIfAborted();
+  return new Blob([bytes], { type: 'application/pdf' });
+}
+
+export const imageToPdf = (file, strength, signal) => imagesToPdf([file], strength, signal);
+
+export async function pdfToImagesZip(file, type, strength, signal, onProgress = () => {}) {
+  signal.throwIfAborted();
+  const task = pdfjs.getDocument({
+    data: new Uint8Array(await file.arrayBuffer()),
+    cMapUrl: new URL('../vendor/pdfjs/cmaps/', import.meta.url).href,
+    cMapPacked: true,
+    standardFontDataUrl: new URL('../vendor/pdfjs/standard_fonts/', import.meta.url).href,
+    wasmUrl: new URL('../vendor/pdfjs/wasm/', import.meta.url).href,
+    iccUrl: new URL('../vendor/pdfjs/iccs/', import.meta.url).href,
+    isEvalSupported: false,
+  });
+  const abort = () => { task.destroy().catch(() => {}); };
+  signal.addEventListener('abort', abort, { once: true });
   try {
-    const limit = strength > 65 ? 1800 : strength > 30 ? 2400 : 3200;
-    const scale = Math.min(1, limit / Math.max(bitmap.width, bitmap.height));
-    canvas.width = Math.max(1, Math.round(bitmap.width * scale));
-    canvas.height = Math.max(1, Math.round(bitmap.height * scale));
-    const context = canvas.getContext('2d', { alpha: false });
-    if (!context) throw new Error(t('canvasMemory'));
-    context.fillStyle = '#fff';
-    context.fillRect(0, 0, canvas.width, canvas.height);
-    context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-    const jpeg = await new Promise((resolve, reject) => canvas.toBlob((blob) => blob?.type === 'image/jpeg' ? resolve(blob) : reject(new Error(t('imageEncodeError'))), 'image/jpeg', (100 - strength) / 100));
+    const pdf = await task.promise;
+    if (pdf.numPages > 200) throw new Error(t('tooManyPages'));
+    const entries = [];
+    let totalBytes = 0;
+    const imageType = type === 'image/png' ? 'image/png' : 'image/jpeg';
+    const extension = imageType === 'image/png' ? 'png' : 'jpg';
+    for (let number = 1; number <= pdf.numPages; number++) {
+      signal.throwIfAborted();
+      const page = await pdf.getPage(number);
+      const canvas = document.createElement('canvas');
+      try {
+        const size = page.getViewport({ scale: 1 });
+        const limit = strength > 65 ? 1600 : strength > 30 ? 2200 : 3200;
+        const scale = Math.min(2, limit / Math.max(size.width, size.height), Math.sqrt(8_000_000 / (size.width * size.height)));
+        const viewport = page.getViewport({ scale });
+        canvas.width = Math.max(1, Math.round(viewport.width));
+        canvas.height = Math.max(1, Math.round(viewport.height));
+        const context = canvas.getContext('2d', { alpha: false });
+        if (!context) throw new Error(t('canvasMemory'));
+        await page.render({ canvas, canvasContext: context, viewport, background: 'white' }).promise;
+        signal.throwIfAborted();
+        const blob = await new Promise((resolve, reject) => canvas.toBlob((value) => value?.type === imageType ? resolve(value) : reject(new Error(t('imageEncodeError'))), imageType, (100 - strength) / 100));
+        totalBytes += blob.size;
+        if (totalBytes > MAX_ZIP_BYTES) throw new Error(t('zipTooLarge'));
+        entries.push({ name: `page-${String(number).padStart(3, '0')}.${extension}`, blob });
+        onProgress('pageProgress', { page: number, total: pdf.numPages });
+      } finally {
+        canvas.width = canvas.height = 0;
+        page.cleanup();
+      }
+    }
+    return await zipBlobs(entries, signal);
+  } catch (error) {
     signal.throwIfAborted();
-    const output = await PDFLib.PDFDocument.create();
-    const embedded = await output.embedJpg(await jpeg.arrayBuffer());
-    output.addPage([canvas.width, canvas.height]).drawImage(embedded, { x: 0, y: 0, width: canvas.width, height: canvas.height });
-    const bytes = await output.save();
-    signal.throwIfAborted();
-    return new Blob([bytes], { type: 'application/pdf' });
+    if (error?.name === 'PasswordException') throw new Error(t('pdfPassword'));
+    throw error;
   } finally {
-    bitmap.close();
-    canvas.width = canvas.height = 0;
+    signal.removeEventListener('abort', abort);
+    await task.destroy();
   }
 }
 

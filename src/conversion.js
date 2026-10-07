@@ -1,6 +1,7 @@
 import * as pdfjs from '../vendor/pdfjs/pdf.mjs';
 import { t } from './i18n.js';
 import { officeEntries } from './office-conversion.js';
+import { UTIF } from '../vendor/generated/tiff-vendor.js';
 
 pdfjs.GlobalWorkerOptions.workerSrc = new URL('../vendor/pdfjs/pdf.worker.mjs', import.meta.url).href;
 
@@ -16,7 +17,15 @@ export async function validateFile(file) {
   const type = starts(0xff, 0xd8, 0xff) ? 'image/jpeg'
     : starts(0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a) ? 'image/png'
       : text.startsWith('RIFF') && text.slice(8, 12) === 'WEBP' ? 'image/webp'
+        : text.startsWith('GIF87a') || text.startsWith('GIF89a') ? 'image/gif'
+          : starts(0x49, 0x49, 0x2a, 0x00) || starts(0x4d, 0x4d, 0x00, 0x2a) ? 'image/tiff'
+            : text.slice(4, 12).includes('ftypavif') || text.slice(4, 12).includes('ftypavis') ? 'image/avif'
+              : /^ftyp(heic|heix|hevc|hevx|mif1)/.test(text.slice(4, 12)) ? 'image/heic'
         : text.startsWith('%PDF-') ? 'application/pdf'
+          : text.slice(4, 8) === 'ftyp' ? 'video/mp4'
+            : starts(0x1a, 0x45, 0xdf, 0xa3) ? 'video/webm'
+              : text.startsWith('fLaC') ? 'audio/flac'
+                : text.startsWith('OggS') ? 'audio/ogg'
           : text.startsWith('RIFF') && text.slice(8, 12) === 'WAVE' ? 'audio/wav'
             : text.startsWith('ID3') || (starts(0xff) && (bytes[1] & 0xe0) === 0xe0) ? 'audio/mpeg'
               : starts(0x50, 0x4b, 0x03, 0x04) ? 'office/zip' : null;
@@ -24,12 +33,36 @@ export async function validateFile(file) {
   if (type === 'office/zip') {
     const archive = await officeEntries(file);
     const documentType = archive.has('word/document.xml') ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-      : archive.has('xl/workbook.xml') ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' : null;
+      : archive.has('xl/workbook.xml') ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        : archive.has('ppt/presentation.xml') ? 'application/vnd.openxmlformats-officedocument.presentationml.presentation' : null;
     if (!documentType) throw new Error(t('unsupported'));
     return new File([file], file.name, { type: documentType, lastModified: file.lastModified });
   }
   // Browsers may supply an empty or incorrect MIME type for local files.
   return file.type === type ? file : new File([file], file.name, { type, lastModified: file.lastModified });
+}
+
+export async function imageBitmap(file) {
+  if (file.type !== 'image/tiff') {
+    try { return await createImageBitmap(file); }
+    catch { throw new Error(t(file.type === 'image/heic' ? 'heicUnavailable' : 'imageReadError')); }
+  }
+  try {
+    const bytes = await file.arrayBuffer();
+    const pages = UTIF.decode(bytes);
+    if (!pages.length) throw new Error();
+    if ((pages[0].t256?.[0] ?? 0) * (pages[0].t257?.[0] ?? 0) > 20_000_000) throw new Error();
+    UTIF.decodeImage(bytes, pages[0]);
+    const pixels = UTIF.toRGBA8(pages[0]);
+    if (pages[0].width * pages[0].height > 20_000_000) throw new Error();
+    const canvas = document.createElement('canvas');
+    canvas.width = pages[0].width;
+    canvas.height = pages[0].height;
+    canvas.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(pixels), canvas.width, canvas.height), 0, 0);
+    const bitmap = await createImageBitmap(canvas);
+    canvas.width = canvas.height = 0;
+    return bitmap;
+  } catch { throw new Error(t('imageReadError')); }
 }
 
 function encodeCanvas(canvas, type, quality) {
@@ -41,7 +74,7 @@ function encodeCanvas(canvas, type, quality) {
 
 export async function compressImage(file, outputType, value, signal) {
   signal.throwIfAborted();
-  const bitmap = await createImageBitmap(file);
+  const bitmap = await imageBitmap(file);
   const canvas = document.createElement('canvas');
   try {
     signal.throwIfAborted();

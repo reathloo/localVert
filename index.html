@@ -41,7 +41,7 @@
         <p class="intro" data-i18n="intro">Convert and optimize files locally.</p>
       </header>
 
-      <input id="file-input" type="file" multiple accept="image/jpeg,image/png,image/webp,application/pdf,audio/mpeg,audio/wav,.mp3,.wav,.docx,.xlsx" hidden>
+      <input id="file-input" type="file" multiple accept=".jpg,.jpeg,.png,.webp,.avif,.gif,.tif,.tiff,.heic,.heif,.pdf,.mp3,.wav,.ogg,.flac,.mp4,.webm,.docx,.xlsx,.pptx" hidden>
       <section id="dropzone" class="dropzone" role="button" tabindex="0" aria-label="Choose a file" data-i18n-aria-label="chooseFile">
         <svg class="drop-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6M8 15h8m-4-4v8"/></svg>
         <strong id="drop-label">Drop a file here</strong>
@@ -107,6 +107,11 @@
           <div class="process-actions">
             <button id="batch-process" class="primary-button" type="button" data-i18n="batchProcess">Process all locally</button>
             <button id="batch-cancel" class="secondary-button" type="button" data-i18n="cancel" hidden>Cancel</button>
+          </div>
+          <div id="merge-actions" class="merge-actions" hidden>
+            <button id="merge-pdf" class="secondary-button" type="button" data-i18n="mergePdf">Combine images into one PDF</button>
+            <button id="merge-download" class="secondary-button" type="button" data-i18n="batchDownload" hidden>Download</button>
+            <span id="merge-size" class="batch-item-status" role="status"></span>
           </div>
           <p id="batch-progress" class="progress" role="status" hidden></p>
           <div id="batch-list" class="batch-list"></div>

@@ -1,8 +1,10 @@
 import { locale, t } from './i18n.js';
 import { initPreferences } from './preferences.js';
 import { compressImage, compressPdf, estimatePdf, pdfPreview, validateFile, MAX_ESTIMATE_SIZE } from './conversion.js';
-import { audioToWav, imageToPdf, pdfToText } from './extra-conversion.js';
+import { imageToPdf, imagesToPdf, pdfToImagesZip, pdfToText } from './extra-conversion.js';
 import { docxToText, xlsxToCsv } from './office-conversion.js';
+import { officeToPdf, pptxToText } from './office-conversion.js';
+import { convertMedia, mediaSupport } from './media-conversion.js';
 
 const $ = (id) => document.getElementById(id);
 const quality = $('quality');
@@ -19,21 +21,51 @@ let selectionVersion = 0;
 let downloadTimer;
 let downloadStarted = false;
 let progressMessage = null;
+let mergedPdf = null;
 const items = [];
 let nextItemId = 0;
 const MAX_BATCH_FILES = 20;
 const previewUrls = [];
+const imageOutputs = [['image/jpeg', 'JPEG'], ['image/png', 'PNG'], ['image/webp', 'WebP'], ['application/pdf', 'PDF']];
+const avifCanvas = document.createElement('canvas');
+avifCanvas.width = avifCanvas.height = 1;
+if (avifCanvas.toDataURL('image/avif').startsWith('data:image/avif')) imageOutputs.splice(3, 0, ['image/avif', 'AVIF']);
 const formats = {
-  'image/jpeg': [['image/jpeg', 'JPEG'], ['image/png', 'PNG'], ['image/webp', 'WebP'], ['application/pdf', 'PDF']],
-  'image/png': [['image/png', 'PNG'], ['image/jpeg', 'JPEG'], ['image/webp', 'WebP'], ['application/pdf', 'PDF']],
-  'image/webp': [['image/webp', 'WebP'], ['image/jpeg', 'JPEG'], ['image/png', 'PNG'], ['application/pdf', 'PDF']],
-  'application/pdf': [['application/pdf', 'PDF'], ['text/plain', 'TXT']],
-  'audio/mpeg': [['audio/wav', 'WAV']],
-  'audio/wav': [['audio/wav', 'WAV']],
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': [['text/plain', 'TXT']],
-  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': [['text/csv', 'CSV']],
+  'image/jpeg': imageOutputs,
+  'image/png': imageOutputs,
+  'image/webp': imageOutputs,
+  'image/avif': imageOutputs,
+  'image/gif': imageOutputs,
+  'image/tiff': imageOutputs,
+  'image/heic': imageOutputs,
+  'application/pdf': [['application/pdf', 'PDF'], ['text/plain', 'TXT'], ['application/x-localvert-jpeg-pages', 'JPG pages (ZIP)'], ['application/x-localvert-png-pages', 'PNG pages (ZIP)']],
+  'audio/mpeg': [['audio/mpeg', 'MP3'], ['audio/ogg', 'Opus (OGG)'], ['audio/flac', 'FLAC'], ['audio/wav', 'WAV']],
+  'audio/wav': [['audio/mpeg', 'MP3'], ['audio/ogg', 'Opus (OGG)'], ['audio/flac', 'FLAC'], ['audio/wav', 'WAV']],
+  'audio/ogg': [['audio/mpeg', 'MP3'], ['audio/ogg', 'Opus (OGG)'], ['audio/flac', 'FLAC'], ['audio/wav', 'WAV']],
+  'audio/flac': [['audio/mpeg', 'MP3'], ['audio/ogg', 'Opus (OGG)'], ['audio/flac', 'FLAC'], ['audio/wav', 'WAV']],
+  'video/mp4': [['video/mp4', 'MP4'], ['video/webm', 'WebM']],
+  'video/webm': [['video/webm', 'WebM'], ['video/mp4', 'MP4']],
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': [['application/pdf', 'PDF'], ['text/plain', 'TXT']],
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': [['application/pdf', 'PDF'], ['text/csv', 'CSV']],
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation': [['application/pdf', 'PDF'], ['text/plain', 'TXT']],
 };
-const extensions = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'application/pdf': 'pdf', 'text/plain': 'txt', 'text/csv': 'csv', 'audio/wav': 'wav' };
+const extensions = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/avif': 'avif', 'application/pdf': 'pdf', 'application/zip': 'zip', 'text/plain': 'txt', 'text/csv': 'csv', 'audio/wav': 'wav', 'audio/mpeg': 'mp3', 'audio/ogg': 'ogg', 'audio/flac': 'flac', 'video/mp4': 'mp4', 'video/webm': 'webm' };
+const mediaCapabilities = new Map();
+let mediaCapabilityCheck;
+
+function availableFormats(type) {
+  const options = formats[type];
+  const supported = options.filter(([output]) => mediaCapabilities.get(output) !== false);
+  return supported.length ? supported : options;
+}
+
+async function checkMediaCapabilities() {
+  mediaCapabilityCheck ??= Promise.all(['audio/mpeg', 'audio/ogg', 'audio/flac', 'audio/wav', 'video/mp4', 'video/webm'].map(async (type) => {
+    try { mediaCapabilities.set(type, await mediaSupport(type)); }
+    catch { mediaCapabilities.set(type, false); }
+  }));
+  await mediaCapabilityCheck;
+}
 
 function formatBytes(bytes) {
   const units = locale === 'fr' ? ['o', 'Ko', 'Mo'] : ['B', 'KB', 'MB'];
@@ -53,7 +85,7 @@ function settings() {
 }
 
 function setFormats(type) {
-  const options = formats[type];
+  const options = availableFormats(type);
   format.replaceChildren(...options.map(([value, label]) => new Option(label, value)));
   format.value = options.some(([value]) => value === type) ? type : options[0][0];
 }
@@ -101,19 +133,23 @@ function renderSettings() {
   if (!file) return;
   const { strength, isPdf, outputType } = settings();
   const isAudio = file.type.startsWith('audio/');
+  const isVideo = file.type.startsWith('video/');
   const isOffice = file.type.includes('officedocument');
   const isPdfText = isPdf && outputType === 'text/plain';
   const hasQuality = !isPdfText && !isOffice;
   $('quality-row').hidden = !hasQuality;
   $('format-row').hidden = false;
-  $('target-row').hidden = !isPdf || isPdfText || strength <= 30;
-  $('pdf-notice').hidden = !isPdf && !isOffice;
-  $('pdf-notice').textContent = isOffice ? t(outputType === 'text/csv' ? 'xlsxNotice' : 'docxNotice')
-    : isPdfText ? t('pdfTextNotice') : t(strength <= 30 ? 'pdfOriginalNotice' : 'pdfRasterNotice');
+  $('target-row').hidden = !isPdf || outputType !== 'application/pdf' || strength <= 30;
+  $('pdf-notice').hidden = !isPdf && !isOffice && !isAudio && !isVideo && !['image/gif', 'image/tiff', 'image/heic'].includes(file.type);
+  $('pdf-notice').textContent = isOffice ? t(outputType === 'application/pdf' ? 'officePdfNotice' : outputType === 'text/csv' ? 'xlsxNotice' : 'docxNotice')
+    : isAudio || isVideo ? t('mediaNotice')
+      : ['image/gif', 'image/tiff'].includes(file.type) ? t('firstFrameNotice')
+        : file.type === 'image/heic' ? t('heicNotice')
+    : isPdfText ? t('pdfTextNotice') : outputType.includes('localvert-') ? t('pdfImageNotice') : t(strength <= 30 ? 'pdfOriginalNotice' : 'pdfRasterNotice');
   $('file-name').textContent = file.name;
   $('file-name').title = file.name;
   $('file-size').textContent = formatBytes(file.size);
-  $('file-kind').textContent = isOffice ? (outputType === 'text/csv' ? 'XLSX' : 'DOCX')
+  $('file-kind').textContent = isOffice ? (file.type.includes('wordprocessingml') ? 'DOCX' : file.type.includes('spreadsheetml') ? 'XLSX' : 'PPTX')
     : file.type === 'audio/mpeg' ? 'MP3' : file.type === 'audio/wav' ? 'WAV' : isPdf ? 'PDF' : file.type.split('/')[1].toUpperCase().replace('JPEG', 'JPG');
   if (!hasQuality) { $('quality-warning').hidden = true; return; }
   const level = strength > 65 ? 'low' : strength > 30 ? 'medium' : 'good';
@@ -122,11 +158,11 @@ function renderSettings() {
   quality.setAttribute('aria-valuetext', $('quality-output').textContent);
   const unchangedPng = outputType === 'image/png' && imageCache && imageCache.sourceWidth === imageCache.width && imageCache.sourceHeight === imageCache.height;
   $('quality-status').className = `quality-status quality-${unchangedPng ? 'good' : level}`;
-  $('quality-status').textContent = t(isAudio ? 'audioQualityNotice' : unchangedPng ? 'resolutionUnchanged' : isPdf && strength <= 30 ? 'qualityUnchanged'
+  $('quality-status').textContent = t(isAudio || isVideo ? 'mediaQualityNotice' : unchangedPng ? 'resolutionUnchanged' : isPdf && strength <= 30 ? 'qualityUnchanged'
     : outputType === 'image/png' ? (strength > 65 ? 'detailsMuchLower' : strength > 30 ? 'detailsReduced' : 'qualityHigh')
       : strength > 65 ? 'qualityMuchLower' : strength > 30 ? 'qualityReduced' : 'qualityHigh');
   $('quality-warning').hidden = strength <= 65 || unchangedPng;
-  $('quality-warning').textContent = t(isAudio ? 'audioWarning' : isPdf ? 'pdfWarning' : outputType === 'image/png' ? 'pngWarning' : 'imageWarning');
+  $('quality-warning').textContent = t(isAudio || isVideo ? 'mediaWarning' : isPdf ? 'pdfWarning' : outputType === 'image/png' ? 'pngWarning' : 'imageWarning');
 }
 
 function renderEstimate() {
@@ -242,13 +278,21 @@ async function selectFiles(candidates) {
   for (const candidate of candidates) {
     try {
       const source = await validateFile(candidate);
-      accepted.push({ id: ++nextItemId, source, outputType: source.type === 'audio/mpeg' ? 'audio/wav' : source.type.includes('officedocument') ? formats[source.type][0][0] : source.type, result: null, error: '', status: 'batchReady', downloaded: false });
+      accepted.push({ id: ++nextItemId, source, result: null, error: '', status: 'batchReady', downloaded: false });
     } catch (error) { errors.push(`${candidate.name}: ${error.message}`); }
   }
   if (version !== selectionVersion) return;
+  if (accepted.some(({ source }) => /^(audio|video)\//.test(source.type))) await checkMediaCapabilities();
+  if (version !== selectionVersion) return;
+  for (const item of accepted) {
+    const options = availableFormats(item.source.type);
+    item.outputType = item.source.type === 'audio/wav' && options.some(([type]) => type === 'audio/mpeg') ? 'audio/mpeg'
+      : options.some(([type]) => type === item.source.type) ? item.source.type : options[0][0];
+  }
   if (errors.length) showError(errors.join(' · '));
   else $('error').hidden = true;
   if (!accepted.length) return;
+  mergedPdf = null;
   if (items.length === 1) {
     items[0].outputType = format.value;
     if (result) items[0].result = result;
@@ -294,6 +338,12 @@ function renderBatch() {
   $('batch-process').disabled = busy;
   $('batch-process').textContent = t(busy ? 'processing' : 'batchProcess');
   $('batch-cancel').hidden = !busy;
+  $('merge-actions').hidden = !items.every((item) => item.source.type.startsWith('image/'));
+  $('merge-pdf').disabled = busy;
+  $('merge-download').hidden = !mergedPdf;
+  $('merge-download').disabled = !!mergedPdf?.downloadBlocked;
+  $('merge-download').textContent = t(mergedPdf?.downloadBlocked ? 'batchDownloadStarted' : mergedPdf?.downloaded ? 'downloadAgain' : 'batchDownload');
+  $('merge-size').textContent = mergedPdf ? formatBytes(mergedPdf.blob.size) : '';
   const list = $('batch-list');
   list.replaceChildren(...items.map((item) => {
     const row = document.createElement('div');
@@ -322,7 +372,7 @@ function renderBatch() {
     select.dataset.action = 'format';
     select.setAttribute('aria-label', `${t('outputFormat')}: ${item.source.name}`);
     select.disabled = busy;
-    select.replaceChildren(...formats[item.source.type].map(([value, label]) => new Option(label, value)));
+    select.replaceChildren(...availableFormats(item.source.type).map(([value, label]) => new Option(label, value)));
     select.value = item.outputType;
     details.append(size, select);
     const status = document.createElement('p');
@@ -355,7 +405,7 @@ function downloadResult(current) {
   const url = URL.createObjectURL(current.blob);
   const link = document.createElement('a');
   link.href = url;
-  link.download = `${current.source.name.replace(/\.[^.]+$/, '')}${t(current.sameFormat ? 'fileSuffix' : 'convertedSuffix')}.${extensions[current.blob.type]}`;
+  link.download = current.filename ?? `${current.source.name.replace(/\.[^.]+$/, '')}${t(current.sameFormat ? 'fileSuffix' : 'convertedSuffix')}.${extensions[current.blob.type]}`;
   document.body.append(link);
   link.click();
   link.remove();
@@ -395,6 +445,7 @@ $('remove-file').addEventListener('click', () => {
   stopEstimate();
   clearResult();
   items.length = 0;
+  mergedPdf = null;
   file = null;
   imageCache = null;
   estimateData = null;
@@ -436,6 +487,7 @@ $('batch-list').addEventListener('click', (event) => {
     }, 2000);
   } else if (button.dataset.action === 'remove') {
     items.splice(items.indexOf(item), 1);
+    mergedPdf = null;
     clearResult();
     stopEstimate();
     showItems();
@@ -444,10 +496,45 @@ $('batch-list').addEventListener('click', (event) => {
   }
 });
 $('batch-quality').addEventListener('input', () => {
+  mergedPdf = null;
   for (const item of items) { item.result = null; item.error = ''; item.status = 'batchReady'; item.downloaded = false; item.downloadBlocked = false; }
   renderBatch();
 });
 $('batch-cancel').addEventListener('click', () => operation?.abort());
+$('merge-pdf').addEventListener('click', async () => {
+  if (operation || items.length < 2 || !items.every((item) => item.source.type.startsWith('image/'))) return;
+  const controller = new AbortController();
+  operation = controller;
+  mergedPdf = null;
+  $('batch-progress').hidden = false;
+  renderBatch();
+  try {
+    const blob = await imagesToPdf(items.map((item) => item.source), Number($('batch-quality').value), controller.signal, (key, values) => {
+      $('batch-progress').textContent = t(key, values);
+    });
+    mergedPdf = { blob, filename: t('mergedPdfName') };
+  } catch (error) {
+    if (!controller.signal.aborted) showError(error instanceof Error ? error.message : t('processingError'));
+  } finally {
+    operation = null;
+    $('batch-progress').hidden = true;
+    renderBatch();
+    if (mergedPdf) $('merge-download').focus({ preventScroll: true });
+  }
+});
+$('merge-download').addEventListener('click', () => {
+  if (!mergedPdf || mergedPdf.downloadBlocked) return;
+  const current = mergedPdf;
+  downloadResult(current);
+  current.downloaded = true;
+  current.downloadBlocked = true;
+  renderBatch();
+  setTimeout(() => {
+    if (mergedPdf !== current) return;
+    current.downloadBlocked = false;
+    renderBatch();
+  }, 2000);
+});
 quality.addEventListener('input', changed);
 format.addEventListener('change', changed);
 target.addEventListener('input', () => { clearResult(); if (items.length === 1) items[0].result = null; $('error').hidden = true; renderEstimate(); });
@@ -457,12 +544,16 @@ async function convert(source, outputType, strength, targetBytes, cached, signal
   const value = 100 - strength;
   const image = source.type.startsWith('image/') && outputType.startsWith('image/')
     ? cached ?? await compressImage(source, outputType, value, signal) : null;
-  const conversion = image ?? (source.type === 'application/pdf' && outputType === 'application/pdf'
+  const conversion = image ?? (source.type === 'application/pdf' && outputType.includes('localvert-')
+    ? { blob: await pdfToImagesZip(source, outputType.includes('png-pages') ? 'image/png' : 'image/jpeg', strength, signal, updateProgress) }
+    : source.type === 'application/pdf' && outputType === 'application/pdf'
     ? await compressPdf(source, value, targetBytes, signal, updateProgress)
     : { blob: source.type === 'application/pdf' ? await pdfToText(source, signal, updateProgress)
       : source.type.startsWith('image/') ? await imageToPdf(source, strength, signal)
-        : source.type.startsWith('audio/') ? await audioToWav(source, strength, signal)
-          : outputType === 'text/csv' ? await xlsxToCsv(source, signal) : await docxToText(source, signal) });
+        : source.type.startsWith('audio/') || source.type.startsWith('video/') ? await convertMedia(source, outputType, strength, signal, updateProgress)
+          : outputType === 'application/pdf' ? await officeToPdf(source, signal)
+            : outputType === 'text/csv' ? await xlsxToCsv(source, signal)
+              : source.type.includes('presentationml') ? await pptxToText(source, signal) : await docxToText(source, signal) });
   signal.throwIfAborted();
   const sameFormat = source.type === outputType;
   const keepOriginal = sameFormat && conversion.blob.size >= source.size;
@@ -530,7 +621,7 @@ $('process').addEventListener('click', async () => {
     renderResult();
     $('download').focus({ preventScroll: true });
     try {
-      if (config.outputType === 'application/pdf' || config.outputType.startsWith('image/')) {
+      if ((config.outputType === 'application/pdf' || config.outputType.startsWith('image/')) && (config.isPdf || source.type.startsWith('image/'))) {
         const original = config.isPdf ? await pdfPreview(source, controller.signal) : source;
         controller.signal.throwIfAborted();
         const converted = keepOriginal ? original : config.outputType === 'application/pdf' ? await pdfPreview(result.blob, controller.signal) : result.blob;

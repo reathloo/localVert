@@ -8,17 +8,18 @@ Das Farbschema folgt zunächst automatisch dem hellen oder dunklen Browser-/Syst
 
 ## Funktionen
 
-- JPG, PNG und WebP per Dateiauswahl oder Drag-and-drop komprimieren und ineinander konvertieren
-- Bilder als einseitiges PDF ausgeben; Transparenz wird dabei weiß hinterlegt
-- PDF im Modus „Qualität erhalten“ unverändert behalten oder als bildbasierte PDF neu erzeugen; auswählbaren PDF-Text als TXT exportieren
+- JPG, PNG und WebP komprimieren und ineinander konvertieren; GIF (erstes Bild), TIFF (erste Seite), AVIF und HEIC als Eingaben. AVIF-Ausgabe und HEIC-Eingabe hängen vom Browser ab.
+- Ein oder mehrere Bilder als PDF ausgeben; Transparenz wird weiß hinterlegt. PDF-Seiten als JPG/PNG in einem ZIP exportieren.
+- PDF im Modus „Qualität erhalten“ unverändert behalten oder als bildbasierte PDF neu erzeugen; auswählbaren PDF-Text als TXT exportieren.
 - Für bildbasierte PDFs optional eine Zielgröße in MB angeben; bis zu drei Qualitätsstufen werden lokal getestet
-- MP3 oder WAV als unkomprimiertes WAV ausgeben; bei WAV die Abtastrate und optional die Kanalzahl reduzieren
-- DOCX als Klartext (TXT) und das erste XLSX-Arbeitsblatt als CSV exportieren
+- MP3, WAV, OGG/Opus und FLAC lokal umwandeln oder komprimieren, soweit der Browser die nötigen Codecs bereitstellt.
+- MP4 und WebM lokal umwandeln oder komprimieren, soweit der Browser die nötigen Codecs bereitstellt.
+- DOCX als TXT, das erste XLSX-Blatt als CSV, PPTX als TXT sowie DOCX/XLSX/PPTX als vereinfachtes PDF exportieren.
 - Bis zu 20 Dateien gemeinsam auswählen oder hinzufügen und nacheinander lokal verarbeiten; Ausgabeformat und Download pro Datei
 - Tatsächliche Größe und Vorher/Nachher-Vorschau der ersten PDF-Seite anzeigen
 - Ergebnis lokal herunterladen
 
-Die Formatliste hängt von der Eingabedatei ab: Es erscheinen nur tatsächlich implementierte Ausgabewege. Bei einer einzelnen Datei wird die Komprimierungsstärke nur für Bild, PDF und Audio angezeigt; in der Stapelansicht gilt ein gemeinsamer Regler, der reine Textexporte nicht verändert. Vorschau und optionale PDF-Zielgröße sind derzeit nur im Ein-Datei-Modus verfügbar. Stapelergebnisse werden einzeln heruntergeladen.
+Die Formatliste hängt von der Eingabe und bei Medien von den Browser-Codecs ab. Der Regler steuert Bild-, PDF-, Audio- und Videoqualität; Office-Exporte bleiben davon unberührt. Die PDF-Zielgröße gibt es nur für einzelne bildbasierte PDF-Ausgaben. Stapelergebnisse werden einzeln heruntergeladen; mehrere Bilder lassen sich zusätzlich zu einem PDF verbinden.
 
 ## Lokal testen
 
@@ -38,12 +39,18 @@ Das Fenster bleibt auch beim Dateiauswählen offen. Ein erneuter Klick auf das E
 
 ## Tests
 
-`node tests/fixtures.mjs tests/generated` erzeugt lokale Testdateien. Anschließend `test-browser.command` starten und unter `http://127.0.0.1:8765/tests/regression.html` auf „Run local fixtures“ klicken. Der Browser-Test umfasst Datei-Erkennung, Bild- und PDF-Pfade, Abbruch, Bild→PDF, PDF→TXT, DOCX→TXT, XLSX→CSV und WAV-Ausgabe. `tests/generated/` ist ignoriert und nicht Teil der Erweiterung.
+`pnpm install` und `pnpm run build:vendor` bauen die mitgelieferten, zur Laufzeit offline verfügbaren Bibliotheken. `node tests/fixtures.mjs tests/generated` erzeugt lokale Testdateien. Danach `test-browser.command` starten und unter `http://127.0.0.1:8765/tests/regression.html` auf „Run local fixtures“ klicken. Die Browser-Regression prüft die wichtigsten Bild-, PDF-, Office-, Audio- und Video-Pfade. `tests/generated/` und `node_modules/` sind nicht Teil der Erweiterung.
+
+## Release-Vorbereitung
+
+`python3 scripts/package_extension.py` erzeugt `dist/localvert-<version>.zip` aus den Erweiterungsdateien einschließlich der lokal gebündelten Medienbibliotheken und Lizenzen. `python3 -m unittest discover -s tests -p 'test_*.py'` prüft Inhalt und Reproduzierbarkeit. GitHub Actions prüft bei Pushes und Pull Requests; das CI-ZIP ist keine Store-Veröffentlichung.
+
+Vor einer Store-Einreichung müssen die installierte Erweiterung in den Zielbrowsern getestet, die jeweiligen Store-Metadaten und Datenschutzangaben erstellt und die Versionsnummer in `manifest.json` erhöht werden. Für Firefox Manifest V3 ist zudem eine feste Add-on-ID erforderlich. Ein Git-Push aktualisiert keine Store-Installation.
 
 ## Grenzen und Datenschutz
 
 Bildbasierte PDFs verlieren Textsuche, Links, Formulare, Vektoren und digitale Signaturen. Das wird vor der Verarbeitung angezeigt. Eine exakt vorgegebene Zielgröße kann nicht garantiert werden. Wenn das Ergebnis bei gleichem Format größer wird, wird stattdessen das Original zum Download angeboten.
 
-DOCX→TXT erhält keine Bilder, Tabellenstruktur, Formatierung oder Seitenaufteilung. XLSX→CSV übernimmt nur Zellwerte des niedrigst nummerierten Arbeitsblatts, keine Formeln, weiteren Blätter oder Formatierung. PDF→TXT funktioniert nur mit auswählbarem Text, nicht mit Scans. WAV ist unkomprimiert: MP3→WAV wird normalerweise größer. Für Audio sind die vom jeweiligen Browser dekodierbaren Eingaben maßgeblich. MP4-Video, MP3-Ausgabe und layoutgetreue Office-Konvertierung sind noch nicht implementiert und werden daher nicht angeboten.
+GIF und TIFF werden auf das erste Bild beziehungsweise die erste Seite reduziert. HEIC benötigt native Browser-Unterstützung; AVIF-Ausgabe nur, wenn der Browser sie kodieren kann. DOCX→TXT, XLSX→CSV und PPTX→TXT erhalten keine Originalformatierung; XLSX→CSV nimmt nur das erste Blatt. Office→PDF setzt Text als Bildseiten neu und kann Bilder, Tabellenlayout, Formeln, Foliengrafiken und Textsuche verlieren. PDF→TXT funktioniert nur mit auswählbarem Text, nicht mit Scans. Audio-/Video-Konvertierung hängt von den im Browser verfügbaren Decodern/Encodern ab; stark komprimierte oder unlesbare Dateien werden verständlich abgelehnt.
 
-Dateien über 100 MB, PDFs über 200 Seiten und Office-Einträge über 25 MB unkomprimiert werden abgelehnt, um den Speicherverbrauch zu begrenzen. Die Erweiterung nutzt lokal gebündelte PDF.js (Apache-2.0) und pdf-lib (MIT); die Lizenzdateien liegen unter `vendor/`. PDF.js enthält lokale WebAssembly-Decoder. Zur Laufzeit wird keine Bibliothek von einem Server geladen.
+Dateien über 100 MB, PDFs über 200 Seiten, Bild-ZIPs über 200 MB und Office-Einträge über 25 MB unkomprimiert werden abgelehnt. Die Erweiterung bündelt PDF.js (Apache-2.0), pdf-lib (MIT), Mediabunny und MP3-Encoder (MPL-2.0) sowie UTIF (MIT) lokal; die Lizenzen liegen unter `vendor/`. Zur Laufzeit wird keine Bibliothek von einem Server geladen.

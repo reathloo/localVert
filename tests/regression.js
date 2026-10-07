@@ -1,7 +1,9 @@
 import { compressImage, compressPdf, estimatePdf, pdfPreview, validateFile } from '../src/conversion.js';
 import { messages } from '../src/i18n.js';
-import { audioToWav, imageToPdf, pdfToText } from '../src/extra-conversion.js';
-import { docxToText, xlsxToCsv } from '../src/office-conversion.js';
+import { audioToWav, imageToPdf, imagesToPdf, pdfToImagesZip, pdfToText } from '../src/extra-conversion.js';
+import { docxToText, xlsxToCsv, pptxToText, officeToPdf } from '../src/office-conversion.js';
+import { convertMedia, mediaSupport } from '../src/media-conversion.js';
+import { ALL_FORMATS, BlobSource, Input } from '../vendor/generated/media-vendor.js';
 
 const output = document.querySelector('#results');
 const assert = (condition, message) => { if (!condition) throw new Error(message); };
@@ -10,7 +12,7 @@ const signal = () => new AbortController().signal;
 output.textContent = 'Ready for local fixtures.';
 document.querySelector('#choose-fixtures').addEventListener('click', () => document.querySelector('#fixtures').click());
 
-const fixtureNames = ['image.png', 'image-no-extension', 'invalid.jpg', 'broken.pdf', 'empty.png', 'text.pdf', 'scan.pdf', 'document.docx', 'sheet.xlsx', 'tone.wav'];
+const fixtureNames = ['image.png', 'image-no-extension', 'image.gif', 'image.tiff', 'invalid.jpg', 'broken.pdf', 'empty.png', 'text.pdf', 'scan.pdf', 'document.docx', 'sheet.xlsx', 'slides.pptx', 'tone.wav'];
 document.querySelector('#run-generated').addEventListener('click', async () => {
   try {
     const files = {};
@@ -26,8 +28,18 @@ document.querySelector('#fixtures').addEventListener('change', (event) => run(Ob
 
 async function run(files) {
   output.textContent = '';
+  const sample = document.querySelector('#sample-pdf');
+  const preview = document.querySelector('#sample-preview');
+  if (sample.href) URL.revokeObjectURL(sample.href);
+  if (preview.src) URL.revokeObjectURL(preview.src);
+  sample.removeAttribute('href');
+  sample.hidden = true;
+  preview.removeAttribute('src');
+  preview.hidden = true;
   let passed = 0;
+  let total = 0;
   async function check(name, run) {
+    total++;
     try { await run(); passed++; output.textContent += `PASS ${name}\n`; }
     catch (error) { output.textContent += `FAIL ${name}: ${error.message}\n`; }
   }
@@ -61,6 +73,16 @@ async function run(files) {
       const decoded = await createImageBitmap(converted.blob);
       assert(decoded.width === converted.width && decoded.height === converted.height, 'Incorrect dimensions');
       decoded.close();
+    });
+  }
+  for (const name of ['image.gif', 'image.tiff']) {
+    await check(`${name} converts locally to PNG`, async () => {
+      const input = await validateFile(files[name]);
+      const converted = await compressImage(input, 'image/png', 60, signal());
+      assert(converted.blob.type === 'image/png', 'Output is not PNG');
+      const bitmap = await createImageBitmap(converted.blob);
+      assert(bitmap.width === 1 && bitmap.height === 1, 'Wrong dimensions');
+      bitmap.close();
     });
   }
   await check('PNG strong compression reduces resolution', async () => {
@@ -115,6 +137,33 @@ async function run(files) {
     const document = await PDFLib.PDFDocument.load(await blob.arrayBuffer());
     assert(blob.type === 'application/pdf' && document.getPageCount() === 1, 'Invalid PDF result');
   });
+  await check('Multiple images produce a readable multi-page PDF', async () => {
+    const blob = await imagesToPdf([png, png], 40, signal());
+    const document = await PDFLib.PDFDocument.load(await blob.arrayBuffer());
+    assert(document.getPageCount() === 2, 'Combined PDF has wrong page count');
+  });
+  await check('PDF pages export as valid PNG files in a ZIP', async () => {
+    const blob = await pdfToImagesZip(pdf, 'image/png', 40, signal());
+    const bytes = new Uint8Array(await blob.arrayBuffer());
+    const view = new DataView(bytes.buffer);
+    const nameLength = view.getUint16(26, true);
+    const start = 30 + nameLength;
+    assert(blob.type === 'application/zip' && view.getUint32(0, true) === 0x04034b50, 'Invalid ZIP header');
+    assert(new TextDecoder().decode(bytes.slice(30, start)) === 'page-001.png', 'Wrong page name');
+    assert(bytes[start] === 137 && bytes[start + 1] === 80 && bytes[start + 2] === 78 && bytes[start + 3] === 71, 'PNG payload missing');
+    assert(view.getUint32(bytes.length - 22, true) === 0x06054b50, 'ZIP directory missing');
+  });
+  await check('PDF page export stops on cancellation', async () => {
+    const controller = new AbortController();
+    let pages = 0;
+    let rejected = false;
+    try {
+      await pdfToImagesZip(files['scan.pdf'], 'image/jpeg', 40, controller.signal, (key) => {
+        if (key === 'pageProgress') { pages++; controller.abort(); }
+      });
+    } catch { rejected = true; }
+    assert(rejected && pages === 1, 'Export continued after cancellation');
+  });
   await check('PDF to text retains selectable text', async () => {
     const blob = await pdfToText(pdf, signal());
     assert((await blob.text()).includes('localVert'), 'Text missing');
@@ -134,11 +183,92 @@ async function run(files) {
     const blob = await xlsxToCsv(file, signal());
     assert((await blob.text()).includes('Name,42') && (await blob.text()).includes('Ada,7'), 'CSV rows missing');
   });
+  await check('PPTX to text reads slide content', async () => {
+    const input = await validateFile(files['slides.pptx']);
+    assert((await (await pptxToText(input, signal())).text()).includes('Hello Slides'), 'Slide text missing');
+  });
+  for (const name of ['document.docx', 'sheet.xlsx', 'slides.pptx']) {
+    await check(`${name} creates readable local PDF`, async () => {
+      const input = await validateFile(files[name]);
+      const blob = await officeToPdf(input, signal());
+      const document = await PDFLib.PDFDocument.load(await blob.arrayBuffer());
+      assert(document.getPageCount() >= 1, 'No PDF page');
+      if (name === 'document.docx') {
+        sample.href = URL.createObjectURL(blob);
+        sample.hidden = false;
+        preview.src = URL.createObjectURL(await pdfPreview(blob, signal()));
+        preview.hidden = false;
+      }
+    });
+  }
+  await check('WAV to MP3 creates valid local output', async () => {
+    const input = await validateFile(files['tone.wav']);
+    const blob = await convertMedia(input, 'audio/mpeg', 40, signal());
+    const bytes = new Uint8Array(await blob.slice(0, 3).arrayBuffer());
+    assert(blob.size > 100 && (bytes[0] === 0xff || String.fromCharCode(...bytes) === 'ID3'), 'MP3 header missing');
+  });
+  await check('WAV and MP3 to WAV create readable output', async () => {
+    const input = await validateFile(files['tone.wav']);
+    const mp3 = await convertMedia(input, 'audio/mpeg', 40, signal());
+    for (const source of [input, await validateFile(new File([mp3], 'tone.mp3'))]) {
+      const blob = await convertMedia(source, 'audio/wav', 40, signal());
+      const bytes = new Uint8Array(await blob.slice(0, 12).arrayBuffer());
+      assert(String.fromCharCode(...bytes.slice(0, 4)) === 'RIFF' && String.fromCharCode(...bytes.slice(8, 12)) === 'WAVE', 'WAV header missing');
+    }
+  });
+  for (const type of ['audio/ogg', 'audio/flac']) {
+    if (await mediaSupport(type)) await check(`WAV to ${type} encodes locally`, async () => {
+      const input = await validateFile(files['tone.wav']);
+      const blob = await convertMedia(input, type, 40, signal());
+      assert(blob.size > 100 && blob.type === type, 'Missing encoded media');
+    });
+  }
+  if (MediaRecorder.isTypeSupported('video/webm;codecs=vp8') && await mediaSupport('video/mp4') && await mediaSupport('video/webm')) {
+    await check('WebM to MP4 and back transcodes locally', async () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 64; canvas.height = 64;
+      const stream = canvas.captureStream(0);
+      const recorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp8' });
+      const chunks = [];
+      recorder.ondataavailable = (event) => { if (event.data.size) chunks.push(event.data); };
+      const ended = new Promise((resolve) => { recorder.onstop = resolve; });
+      recorder.start();
+      const context = canvas.getContext('2d');
+      for (let frame = 0; frame < 10; frame++) {
+        context.fillStyle = frame % 2 ? 'tomato' : 'royalblue';
+        context.fillRect(0, 0, 64, 64);
+        stream.getVideoTracks()[0].requestFrame();
+        await new Promise((resolve) => setTimeout(resolve, 80));
+      }
+      recorder.stop();
+      await ended;
+      stream.getTracks().forEach((track) => track.stop());
+      const input = await validateFile(new File(chunks, 'sample.webm', { type: 'video/webm' }));
+      const sourceProbe = new Input({ source: new BlobSource(input), formats: ALL_FORMATS });
+      const sourceTracks = await sourceProbe.getVideoTracks();
+      sourceProbe.dispose();
+      assert(sourceTracks.length > 0, 'Recorded WebM has no video track');
+      const optimized = await convertMedia(input, 'video/webm', 70, signal());
+      assert(optimized.size > 100, 'Optimized WebM is empty');
+      const result = await convertMedia(input, 'video/mp4', 40, signal());
+      const bytes = new Uint8Array(await result.slice(4, 8).arrayBuffer());
+      assert(result.size > 100 && String.fromCharCode(...bytes) === 'ftyp', 'MP4 header missing');
+      const resultProbe = new Input({ source: new BlobSource(result), formats: ALL_FORMATS });
+      const resultTracks = await resultProbe.getVideoTracks();
+      resultProbe.dispose();
+      assert(resultTracks.length > 0, 'Converted MP4 has no video track');
+      let roundTrip;
+      try { roundTrip = await convertMedia(await validateFile(new File([result], 'sample.mp4')), 'video/webm', 70, signal()); }
+      catch (error) { throw new Error(`MP4 → WebM: ${error.message} (${error.cause ?? 'no detail'})`); }
+      const webm = new Uint8Array(await roundTrip.slice(0, 4).arrayBuffer());
+      assert(roundTrip.size > 100 && webm.join() === '26,69,223,163', 'WebM header missing');
+    });
+  }
   await check('WAV conversion retains valid audio header', async () => {
     const file = await validateFile(files['tone.wav']);
     const blob = await audioToWav(file, 40, signal());
     const bytes = new Uint8Array(await blob.slice(0, 12).arrayBuffer());
     assert(String.fromCharCode(...bytes.slice(0, 4)) === 'RIFF' && String.fromCharCode(...bytes.slice(8, 12)) === 'WAVE', 'Invalid WAV result');
   });
-  output.textContent += `\n${passed}/22 checks passed.\n`;
+  output.textContent += `\n${passed}/${total} checks passed.\n`;
 }

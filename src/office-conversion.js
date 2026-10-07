@@ -135,3 +135,71 @@ export async function xlsxToCsv(file, signal) {
   signal.throwIfAborted();
   return new Blob(['\ufeff', rows.join('\r\n'), '\r\n'], { type: 'text/csv' });
 }
+
+export async function pptxToText(file, signal) {
+  signal.throwIfAborted();
+  const zip = await officeEntries(file);
+  const slides = zip.names().filter((name) => /^ppt\/slides\/slide\d+\.xml$/.test(name))
+    .sort((a, b) => Number(a.match(/slide(\d+)/)[1]) - Number(b.match(/slide(\d+)/)[1]));
+  if (!slides.length || slides.length > 200) throw new Error(t('officeReadError'));
+  const pages = [];
+  for (const name of slides) {
+    signal.throwIfAborted();
+    const slide = xml(await zip.read(name));
+    pages.push(elements(slide, 'p').map((paragraph) => elements(paragraph, 't').map((part) => part.textContent).join('')).filter(Boolean).join('\n'));
+  }
+  return new Blob([pages.join('\n\n---\n\n')], { type: 'text/plain' });
+}
+
+export async function officeToPdf(file, signal) {
+  const text = file.type.includes('wordprocessingml') ? await (await docxToText(file, signal)).text()
+    : file.type.includes('spreadsheetml') ? await (await xlsxToCsv(file, signal)).text()
+      : await (await pptxToText(file, signal)).text();
+  signal.throwIfAborted();
+  const pdf = await PDFLib.PDFDocument.create();
+  const canvas = document.createElement('canvas');
+  canvas.width = 1190;
+  canvas.height = 1684;
+  const ctx = canvas.getContext('2d', { alpha: false });
+  if (!ctx) throw new Error(t('canvasMemory'));
+  const margin = 90;
+  const lineHeight = 34;
+  const pageHeight = canvas.height - margin;
+  const maxPages = 200;
+  let y = margin;
+  const newPage = () => {
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#111';
+    ctx.font = '26px sans-serif';
+    y = margin;
+  };
+  const savePage = async () => {
+    if (pdf.getPageCount() >= maxPages) throw new Error(t('tooManyPages'));
+    const image = await new Promise((resolve, reject) => canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error(t('imageEncodeError'))), 'image/jpeg', .86));
+    const embedded = await pdf.embedJpg(await image.arrayBuffer());
+    pdf.addPage([595, 842]).drawImage(embedded, { x: 0, y: 0, width: 595, height: 842 });
+  };
+  newPage();
+  for (const paragraph of text.replaceAll('\r', '').split('\n')) {
+    signal.throwIfAborted();
+    const words = paragraph.split(/\s+/);
+    let line = '';
+    for (const word of words) {
+      const next = line ? `${line} ${word}` : word;
+      if (ctx.measureText(next).width > canvas.width - 2 * margin && line) {
+        if (y + lineHeight > pageHeight) { await savePage(); newPage(); }
+        ctx.fillText(line, margin, y);
+        y += lineHeight;
+        line = word;
+      } else line = next;
+    }
+    if (y + lineHeight > pageHeight) { await savePage(); newPage(); }
+    ctx.fillText(line, margin, y);
+    y += lineHeight;
+  }
+  await savePage();
+  canvas.width = canvas.height = 0;
+  signal.throwIfAborted();
+  return new Blob([await pdf.save()], { type: 'application/pdf' });
+}

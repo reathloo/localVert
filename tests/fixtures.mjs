@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { deflateSync, deflateRawSync } from 'node:zlib';
 import pdfLib from '../vendor/pdf-lib/pdf-lib.min.js';
+import UTIF from 'utif';
 
 const directory = process.argv[2] ? join(process.cwd(), process.argv[2]) : await mkdtemp(join(tmpdir(), 'localvert-tests-'));
 if (process.argv[2]) await mkdir(directory, { recursive: true });
@@ -49,6 +50,8 @@ async function save(name, content) {
 }
 await save('image.png', png);
 await save('image-no-extension', png);
+await save('image.gif', Buffer.from('R0lGODlhAQABAAD/ACwAAAAAAQABAAACAUwAOw==', 'base64'));
+await save('image.tiff', Buffer.from(UTIF.encodeImage(new Uint8Array([255, 0, 0, 255]), 1, 1)));
 await save('invalid.jpg', 'This is not an image.');
 await save('broken.pdf', '%PDF-1.7\nBroken PDF for error handling.');
 await save('empty.png', '');
@@ -110,6 +113,10 @@ await save('sheet.xlsx', zip({
   'xl/workbook.xml': '<?xml version="1.0"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheets><sheet name="Sheet1" sheetId="1"/></sheets></workbook>',
   'xl/sharedStrings.xml': '<?xml version="1.0"?><sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><si><t>Name</t></si><si><t>Ada</t></si></sst>',
   'xl/worksheets/sheet1.xml': '<?xml version="1.0"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1" t="s"><v>0</v></c><c r="B1"><v>42</v></c></row><row r="2"><c r="A2" t="s"><v>1</v></c><c r="B2"><v>7</v></c></row></sheetData></worksheet>',
+}));
+await save('slides.pptx', zip({
+  'ppt/presentation.xml': '<?xml version="1.0"?><p:presentation xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"/>',
+  'ppt/slides/slide1.xml': '<?xml version="1.0"?><p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:p><a:r><a:t>Hello Slides</a:t></a:r></a:p></p:sld>',
 }));
 const wav = Buffer.alloc(44 + 44100 * 2);
 wav.write('RIFF'); wav.writeUInt32LE(wav.length - 8, 4); wav.write('WAVE', 8); wav.write('fmt ', 12);
