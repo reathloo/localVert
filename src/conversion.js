@@ -72,7 +72,7 @@ function encodeCanvas(canvas, type, quality) {
   }, type, quality));
 }
 
-export async function compressImage(file, outputType, value, signal) {
+export async function compressImage(file, outputType, value, signal, options = {}) {
   signal.throwIfAborted();
   const bitmap = await imageBitmap(file);
   const canvas = document.createElement('canvas');
@@ -80,19 +80,32 @@ export async function compressImage(file, outputType, value, signal) {
     signal.throwIfAborted();
     const sourceWidth = bitmap.width;
     const sourceHeight = bitmap.height;
-    const maxDimension = value < 35 ? 1800 : value < 70 ? 2400 : 3200;
+    const maxDimension = Math.min(options.maxDimension || Infinity, value < 35 ? 1800 : value < 70 ? 2400 : 3200);
     const strength = 100 - value;
     const pngScale = outputType === 'image/png' && strength > 30 ? 1 - .5 * (strength - 30) / 60 : 1;
-    const scale = Math.min(1, maxDimension / Math.max(sourceWidth, sourceHeight)) * pngScale;
-    canvas.width = Math.max(1, Math.round(sourceWidth * scale));
-    canvas.height = Math.max(1, Math.round(sourceHeight * scale));
+    const side = Math.min(sourceWidth, sourceHeight);
+    const crop = options.squareCrop ? { x: Math.floor((sourceWidth - side) / 2), y: Math.floor((sourceHeight - side) / 2), width: side, height: side }
+      : options.crop || { x: 0, y: 0, width: sourceWidth, height: sourceHeight };
+    if (![crop.x, crop.y, crop.width, crop.height].every(Number.isFinite) || crop.x < 0 || crop.y < 0 || crop.width <= 0 || crop.height <= 0 || crop.x + crop.width > sourceWidth || crop.y + crop.height > sourceHeight) throw new Error(t('invalidCrop'));
+    const rotation = options.rotation || 0;
+    if (![0, 90, 180, 270].includes(rotation)) throw new Error(t('invalidCrop'));
+    const rotated = rotation === 90 || rotation === 270;
+    const baseWidth = rotated ? crop.height : crop.width;
+    const baseHeight = rotated ? crop.width : crop.height;
+    const scale = Math.min(1, maxDimension / Math.max(baseWidth, baseHeight), Math.sqrt(20_000_000 / (baseWidth * baseHeight))) * pngScale;
+    canvas.width = Math.max(1, Math.round(baseWidth * scale));
+    canvas.height = Math.max(1, Math.round(baseHeight * scale));
     const context = canvas.getContext('2d', { alpha: outputType !== 'image/jpeg' });
     if (!context) throw new Error(t('canvasMemory'));
     if (outputType === 'image/jpeg') {
       context.fillStyle = '#fff';
       context.fillRect(0, 0, canvas.width, canvas.height);
     }
-    context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    context.translate(canvas.width / 2, canvas.height / 2);
+    context.rotate(rotation * Math.PI / 180);
+    context.drawImage(bitmap, crop.x, crop.y, crop.width, crop.height,
+      -(rotated ? canvas.height : canvas.width) / 2, -(rotated ? canvas.width : canvas.height) / 2,
+      rotated ? canvas.height : canvas.width, rotated ? canvas.width : canvas.height);
     const blob = await encodeCanvas(canvas, outputType, Math.max(.1, Math.min(1, value / 100)));
     signal.throwIfAborted();
     return { blob, sourceWidth, sourceHeight, width: canvas.width, height: canvas.height };
@@ -100,6 +113,18 @@ export async function compressImage(file, outputType, value, signal) {
     bitmap.close();
     canvas.width = canvas.height = 0;
   }
+}
+
+export async function compressImageToTarget(file, outputType, targetBytes, signal, options = {}) {
+  const attempts = [80, 65, 50, 35, 20, 10];
+  let best;
+  for (const value of attempts) {
+    signal.throwIfAborted();
+    const candidate = await compressImage(file, outputType, value, signal, options);
+    if (!best || candidate.blob.size < best.blob.size) best = candidate;
+    if (candidate.blob.size <= targetBytes) return { ...candidate, targetMet: true };
+  }
+  return { ...best, targetMet: false };
 }
 
 async function withPdf(file, signal, run) {
@@ -181,14 +206,48 @@ async function rasterizePdf(source, profile, signal, onProgress = () => {}, page
 
 export function estimatePdf(file, value, signal) {
   return withPdf(file, signal, async (pdf) => {
+    if (value >= 70) {
+      const optimized = await optimizePdfStructure(file, signal);
+      return { size: optimized.blob.size, pages: pdf.numPages, structural: true };
+    }
     const sample = await rasterizePdf(pdf, profiles(value)[0], signal, undefined, 1);
     return { size: sample.size * pdf.numPages, pages: pdf.numPages };
   });
 }
 
+export async function optimizePdfStructure(file, signal) {
+  signal.throwIfAborted();
+  if (file.size > MAX_ESTIMATE_SIZE) return { blob: file, reason: 'pdfLargeKept' };
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  signal.throwIfAborted();
+  // Rewriting signed or interactive PDFs can invalidate important features.
+  const decoder = new TextDecoder('latin1');
+  let tail = '';
+  for (let offset = 0; offset < bytes.length; offset += 1024 ** 2) {
+    signal.throwIfAborted();
+    const chunk = tail + decoder.decode(bytes.subarray(offset, offset + 1024 ** 2));
+    if (/\/(?:ByteRange|Sig|AcroForm|XFA|Encrypt|Annots|Outlines|EmbeddedFiles|OCProperties|StructTreeRoot)\b/.test(chunk)) return { blob: file, reason: 'pdfComplexKept' };
+    tail = chunk.slice(-64);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  }
+  try {
+    const document = await PDFLib.PDFDocument.load(bytes, { updateMetadata: false });
+    const pageCount = document.getPageCount();
+    const saved = await document.save({ useObjectStreams: true, addDefaultPage: false, updateFieldAppearances: false });
+    signal.throwIfAborted();
+    if (saved.length >= file.size) return { blob: file, reason: 'pdfNoStructuralSaving' };
+    const check = await PDFLib.PDFDocument.load(saved, { updateMetadata: false });
+    if (check.getPageCount() !== pageCount) return { blob: file, reason: 'pdfComplexKept' };
+    return { blob: new Blob([saved], { type: 'application/pdf' }), structural: true };
+  } catch {
+    signal.throwIfAborted();
+    return { blob: file, reason: 'pdfComplexKept' };
+  }
+}
+
 export function compressPdf(file, value, targetBytes, signal, onProgress) {
   return withPdf(file, signal, async (pdf) => {
-    if (value >= 70) return { blob: file, reducedFurther: false };
+    if (value >= 70) return { ...await optimizePdfStructure(file, signal), reducedFurther: false };
     const variants = profiles(value);
     let best;
     for (let index = 0; index < (targetBytes ? variants.length : 1); index += 1) {

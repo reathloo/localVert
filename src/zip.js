@@ -8,9 +8,13 @@ const table = Uint32Array.from({ length: 256 }, (_, index) => {
   return value >>> 0;
 });
 
-function crc32(bytes) {
+async function crc32(bytes, signal) {
   let value = 0xffffffff;
-  for (const byte of bytes) value = table[(value ^ byte) & 255] ^ (value >>> 8);
+  for (let offset = 0; offset < bytes.length; offset += 65536) {
+    signal.throwIfAborted();
+    for (const byte of bytes.subarray(offset, offset + 65536)) value = table[(value ^ byte) & 255] ^ (value >>> 8);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  }
   return (value ^ 0xffffffff) >>> 0;
 }
 
@@ -23,9 +27,9 @@ export async function zipBlobs(entries, signal) {
   for (const { name, blob } of entries) {
     signal.throwIfAborted();
     const filename = encoder.encode(name);
+    if (filename.length > 65535 || blob.size > MAX_ZIP_BYTES || offset + blob.size > MAX_ZIP_BYTES) throw new Error(t('zipTooLarge'));
     const bytes = new Uint8Array(await blob.arrayBuffer());
-    if (filename.length > 65535 || bytes.length > MAX_ZIP_BYTES || offset + bytes.length > MAX_ZIP_BYTES) throw new Error(t('zipTooLarge'));
-    const checksum = crc32(bytes);
+    const checksum = await crc32(bytes, signal);
     const header = new ArrayBuffer(30);
     const local = new DataView(header);
     local.setUint32(0, 0x04034b50, true);

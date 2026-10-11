@@ -1,9 +1,11 @@
-import { compressImage, compressPdf, estimatePdf, pdfPreview, validateFile } from '../src/conversion.js';
+import { compressImage, compressImageToTarget, compressPdf, estimatePdf, pdfPreview, validateFile } from '../src/conversion.js';
 import { messages } from '../src/i18n.js';
 import { audioToWav, imageToPdf, imagesToPdf, pdfToImagesZip, pdfToText } from '../src/extra-conversion.js';
 import { docxToText, xlsxToCsv, pptxToText, officeToPdf } from '../src/office-conversion.js';
 import { convertMedia, mediaSupport } from '../src/media-conversion.js';
 import { ALL_FORMATS, BlobSource, Input } from '../vendor/generated/media-vendor.js';
+import { zipBlobs } from '../src/zip.js';
+import { fillUploadField } from '../src/upload-field.js';
 
 const output = document.querySelector('#results');
 const assert = (condition, message) => { if (!condition) throw new Error(message); };
@@ -89,15 +91,40 @@ async function run(files) {
     const converted = await compressImage(png, 'image/png', 10, signal());
     assert(converted.width === 450 && converted.height === 325, 'Incorrect resolution');
   });
+  await check('Image resize, rotation and center crop produce correct dimensions', async () => {
+    const resized = await compressImage(png, 'image/jpeg', 80, signal(), { maxDimension: 800, rotation: 90, squareCrop: true });
+    const bitmap = await createImageBitmap(resized.blob);
+    assert(bitmap.width === bitmap.height && bitmap.width <= 800 && bitmap.width > 0, 'Image options did not apply');
+    bitmap.close();
+  });
+  await check('Target size reports success or failure honestly', async () => {
+    const candidate = await compressImageToTarget(png, 'image/jpeg', 1, signal());
+    assert(candidate.targetMet === (candidate.blob.size <= 1), 'Target state is incorrect');
+  });
   await check('Pre-cancelled image conversion rejects', async () => {
     const controller = new AbortController(); controller.abort();
     let rejected = false;
     try { await compressImage(png, 'image/jpeg', 60, controller.signal); } catch (error) { rejected = error.name === 'AbortError'; }
     assert(rejected, 'Cancelled image conversion continued');
   });
-  await check('Preserved PDF is byte-identical', async () => {
+  await check('Structure-preserving PDF remains readable', async () => {
     const converted = await compressPdf(pdf, 80, null, signal(), () => {});
-    assert(await hash(converted.blob) === await hash(pdf), 'Original PDF changed');
+    const loaded = await PDFLib.PDFDocument.load(await converted.blob.arrayBuffer());
+    assert(loaded.getPageCount() === 1 && converted.blob.size <= pdf.size, 'PDF optimization damaged document');
+    assert((await (await pdfToText(converted.blob, signal())).text()).includes('localVert'), 'Selectable text was lost');
+  });
+  await check('PDF with signature marker is kept unchanged', async () => {
+    const signed = new File([pdf, '\n/ByteRange [0 1 2 3]\n'], 'signed.pdf', { type: 'application/pdf' });
+    const converted = await compressPdf(signed, 80, null, signal(), () => {});
+    assert(await hash(converted.blob) === await hash(signed), 'Signed PDF was modified');
+  });
+  await check('Interactive PDF form is kept unchanged', async () => {
+    const document = await PDFLib.PDFDocument.create();
+    const page = document.addPage([300, 200]);
+    document.getForm().createTextField('name').addToPage(page, { x: 20, y: 100, width: 180, height: 30 });
+    const form = new File([await document.save()], 'form.pdf', { type: 'application/pdf' });
+    const converted = await compressPdf(form, 80, null, signal(), () => {});
+    assert(await hash(converted.blob) === await hash(form), 'Form PDF was modified');
   });
   await check('PDF estimate and compression create valid output', async () => {
     const source = files['scan.pdf'];
@@ -152,6 +179,22 @@ async function run(files) {
     assert(new TextDecoder().decode(bytes.slice(30, start)) === 'page-001.png', 'Wrong page name');
     assert(bytes[start] === 137 && bytes[start + 1] === 80 && bytes[start + 2] === 78 && bytes[start + 3] === 71, 'PNG payload missing');
     assert(view.getUint32(bytes.length - 22, true) === 0x06054b50, 'ZIP directory missing');
+  });
+  await check('Batch ZIP contains both local results', async () => {
+    const zipped = await zipBlobs([{ name: 'first.png', blob: png }, { name: 'second.png', blob: png }], signal());
+    const bytes = new Uint8Array(await zipped.arrayBuffer());
+    const footer = new DataView(bytes.buffer, bytes.byteLength - 22);
+    assert(footer.getUint16(10, true) === 2, 'Wrong ZIP entry count');
+  });
+  await check('Upload helper inserts only a compatible local file', () => {
+    const field = document.createElement('input');
+    field.type = 'file'; field.accept = '.png';
+    document.body.append(field);
+    try {
+      const inserted = fillUploadField(btoa('PNG'), 'result.png', 'image/png');
+      assert(inserted && field.files.length === 1 && field.files[0].name === 'result.png', 'File was not inserted');
+      assert(!fillUploadField(btoa('PDF'), 'result.pdf', 'application/pdf'), 'Wrong format accepted');
+    } finally { field.remove(); }
   });
   await check('PDF page export stops on cancellation', async () => {
     const controller = new AbortController();

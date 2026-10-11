@@ -9,17 +9,19 @@ Das Farbschema folgt zunächst automatisch dem hellen oder dunklen Browser-/Syst
 ## Funktionen
 
 - JPG, PNG und WebP komprimieren und ineinander konvertieren; GIF (erstes Bild), TIFF (erste Seite), AVIF und HEIC als Eingaben. AVIF-Ausgabe und HEIC-Eingabe hängen vom Browser ab.
+- Bei Bildern längste Kante, Drehung und mittigen quadratischen Zuschnitt einstellen. Neu kodierte Bilder enthalten keine ursprünglichen EXIF-Standortdaten; das Original bleibt unangetastet.
 - Ein oder mehrere Bilder als PDF ausgeben; Transparenz wird weiß hinterlegt. PDF-Seiten als JPG/PNG in einem ZIP exportieren.
-- PDF im Modus „Qualität erhalten“ unverändert behalten oder als bildbasierte PDF neu erzeugen; auswählbaren PDF-Text als TXT exportieren.
+- PDF im schonenden Modus strukturerhaltend neu speichern, wenn dabei Platz gespart wird. PDFs mit erkennbaren Formularen/Signaturen sowie nicht kleinere Ergebnisse bleiben unverändert. Alternativ bildbasierte PDF neu erzeugen; auswählbaren PDF-Text als TXT exportieren.
 - Für bildbasierte PDFs optional eine Zielgröße in MB angeben; bis zu drei Qualitätsstufen werden lokal getestet
 - MP3, WAV, OGG/Opus und FLAC lokal umwandeln oder komprimieren, soweit der Browser die nötigen Codecs bereitstellt.
 - MP4 und WebM lokal umwandeln oder komprimieren, soweit der Browser die nötigen Codecs bereitstellt.
 - DOCX als TXT, das erste XLSX-Blatt als CSV, PPTX als TXT sowie DOCX/XLSX/PPTX als vereinfachtes PDF exportieren.
-- Bis zu 20 Dateien gemeinsam auswählen oder hinzufügen und nacheinander lokal verarbeiten; Ausgabeformat und Download pro Datei
+- Bis zu 20 Dateien gemeinsam auswählen oder hinzufügen und nacheinander lokal verarbeiten; Ausgabeformat und Download pro Datei oder ein gemeinsames ZIP bis 200 MB
+- Optional nach einem Klick ein Ergebnis bis 2 MB in ein eindeutiges, passendes Datei-Upload-Feld der ursprünglich geöffneten Webseite einsetzen. localVert sendet es nicht selbst; die Webseite kann nach dem Einsetzen allerdings sofort einen Upload starten. Wenn kein passendes Feld gefunden wird, bleibt der normale Download verfügbar.
 - Tatsächliche Größe und Vorher/Nachher-Vorschau der ersten PDF-Seite anzeigen
 - Ergebnis lokal herunterladen
 
-Die Formatliste hängt von der Eingabe und bei Medien von den Browser-Codecs ab. Der Regler steuert Bild-, PDF-, Audio- und Videoqualität; Office-Exporte bleiben davon unberührt. Die PDF-Zielgröße gibt es nur für einzelne bildbasierte PDF-Ausgaben. Stapelergebnisse werden einzeln heruntergeladen; mehrere Bilder lassen sich zusätzlich zu einem PDF verbinden.
+Die Formatliste hängt von der Eingabe und bei Medien von den Browser-Codecs ab. Der Regler steuert Bild-, PDF-, Audio- und Videoqualität; Office-Exporte bleiben davon unberührt. Die Zielgröße in MB gilt für einzelne Bild- oder PDF-Ausgaben und wird nach der Verarbeitung ehrlich als erreicht oder verfehlt angezeigt. Mehrere Bilder lassen sich zusätzlich zu einem PDF verbinden.
 
 ## Lokal testen
 
@@ -49,8 +51,8 @@ Vor einer Store-Einreichung müssen die installierte Erweiterung in den Zielbrow
 
 ## Grenzen und Datenschutz
 
-Bildbasierte PDFs verlieren Textsuche, Links, Formulare, Vektoren und digitale Signaturen. Das wird vor der Verarbeitung angezeigt. Eine exakt vorgegebene Zielgröße kann nicht garantiert werden. Wenn das Ergebnis bei gleichem Format größer wird, wird stattdessen das Original zum Download angeboten.
+Bildbasierte PDFs verlieren Textsuche, Links, Formulare, Vektoren und digitale Signaturen. Das wird vor der Verarbeitung angezeigt. Strukturerhaltendes Umspeichern ist bewusst vorsichtig, aber keine allgemeine PDF-Reparatur oder Garantie für jedes seltene PDF-Merkmal. Eine exakt vorgegebene Zielgröße kann nicht garantiert werden. Wenn das Ergebnis bei gleichem Format größer wird, wird ohne ausdrücklich gewählte Bildanpassung stattdessen das Original zum Download angeboten.
 
 GIF und TIFF werden auf das erste Bild beziehungsweise die erste Seite reduziert. HEIC benötigt native Browser-Unterstützung; AVIF-Ausgabe nur, wenn der Browser sie kodieren kann. DOCX→TXT, XLSX→CSV und PPTX→TXT erhalten keine Originalformatierung; XLSX→CSV nimmt nur das erste Blatt. Office→PDF setzt Text als Bildseiten neu und kann Bilder, Tabellenlayout, Formeln, Foliengrafiken und Textsuche verlieren. PDF→TXT funktioniert nur mit auswählbarem Text, nicht mit Scans. Audio-/Video-Konvertierung hängt von den im Browser verfügbaren Decodern/Encodern ab; stark komprimierte oder unlesbare Dateien werden verständlich abgelehnt.
 
-Dateien über 100 MB, PDFs über 200 Seiten, Bild-ZIPs über 200 MB und Office-Einträge über 25 MB unkomprimiert werden abgelehnt. Die Erweiterung bündelt PDF.js (Apache-2.0), pdf-lib (MIT), Mediabunny und MP3-Encoder (MPL-2.0) sowie UTIF (MIT) lokal; die Lizenzen liegen unter `vendor/`. Zur Laufzeit wird keine Bibliothek von einem Server geladen.
+Dateien über 100 MB, PDFs über 200 Seiten, ZIP-Ausgaben über 200 MB und Office-Einträge über 25 MB unkomprimiert werden abgelehnt. Die optionale Upload-Feld-Hilfe benötigt die Erweiterungsrechte `activeTab` und `scripting`; sie greift nur auf die per Klick aktivierte Seite zu und kann bei mehreren Feldern oder browsergeschützten Seiten scheitern. Die Erweiterung bündelt PDF.js (Apache-2.0), pdf-lib (MIT), Mediabunny und MP3-Encoder (MPL-2.0) sowie UTIF (MIT) lokal; die Lizenzen liegen unter `vendor/`. Zur Laufzeit wird keine Bibliothek von einem Server geladen.

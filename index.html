@@ -69,6 +69,14 @@
             <div id="quality-direction" class="range-hints"><span data-i18n="gentleHint">Gentle · high quality</span><span data-i18n="strongHint">Strong · lower quality</span></div>
             <div id="quality-status" class="quality-status" role="status"></div>
           </div>
+          <details id="image-options" hidden>
+            <summary data-i18n="imageAdjust">Adjust image</summary>
+            <div class="image-options-grid">
+            <div class="control-group"><label for="max-dimension" data-i18n="maxDimension">Longest edge (px)</label><input id="max-dimension" type="number" min="1" max="10000" placeholder="Auto" data-i18n-placeholder="autoSize"></div>
+            <div class="control-group"><label for="rotation" data-i18n="rotate">Rotate</label><select id="rotation"><option value="0" data-i18n="noRotation">No rotation</option><option value="90">90°</option><option value="180">180°</option><option value="270">270°</option></select></div>
+            <label class="check-row"><input id="square-crop" type="checkbox"><span data-i18n="squareCrop">Center crop to square</span></label>
+            </div>
+          </details>
           <div id="target-row" class="control-group" hidden>
             <label for="target-size" data-i18n="targetSize">Target size (MB, optional)</label>
             <input id="target-size" type="text" inputmode="decimal" placeholder="e.g. 2.5" data-i18n-placeholder="targetPlaceholder" aria-describedby="target-help">
@@ -84,6 +92,9 @@
           <button id="cancel" class="secondary-button" type="button" data-i18n="cancel" hidden>Cancel</button>
         </div>
         <p id="download-status" class="download-status" role="status" hidden></p>
+        <button id="upload-field" class="secondary-button upload-field" type="button" data-i18n="useInUpload" hidden>Use in upload field</button>
+        <p id="upload-warning" class="field-help" data-i18n="uploadWarning" hidden>The website may upload the file as soon as it is inserted.</p>
+        <p id="upload-status" class="field-help" role="status" hidden></p>
         <p id="progress" class="progress" role="status" hidden></p>
 
         <section id="result-panel" class="result-panel" aria-labelledby="result-title" hidden>
@@ -108,6 +119,7 @@
             <button id="batch-process" class="primary-button" type="button" data-i18n="batchProcess">Process all locally</button>
             <button id="batch-cancel" class="secondary-button" type="button" data-i18n="cancel" hidden>Cancel</button>
           </div>
+          <button id="batch-zip" class="secondary-button batch-zip" type="button" data-i18n="downloadZip" hidden>Download all as ZIP</button>
           <div id="merge-actions" class="merge-actions" hidden>
             <button id="merge-pdf" class="secondary-button" type="button" data-i18n="mergePdf">Combine images into one PDF</button>
             <button id="merge-download" class="secondary-button" type="button" data-i18n="batchDownload" hidden>Download</button>

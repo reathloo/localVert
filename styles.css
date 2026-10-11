@@ -73,7 +73,15 @@ h1 { margin: 0; font-size: 23px; font-weight: 650; letter-spacing: -.8px; }
 .control-label output { font-weight: 500; color: var(--quality-color, var(--warning)); }
 .format-row { display: grid; grid-template-columns: 1fr 1.1fr; align-items: center; gap: 14px; }
 .format-row > label { margin: 0; }
-select, input[type="text"] { width: 100%; min-width: 0; padding: 9px 10px; border: 1px solid var(--border); border-radius: 5px; color: var(--text); background: var(--surface); font-size: 12px; }
+select, input[type="text"], input[type="number"] { width: 100%; min-width: 0; padding: 9px 10px; border: 1px solid var(--border); border-radius: 5px; color: var(--text); background: var(--surface); font-size: 12px; }
+#image-options { margin: 12px 0; border-top: 1px solid var(--border); }
+#image-options summary { padding: 12px 0 0; color: var(--accent); font-size: 12px; cursor: pointer; }
+.image-options-grid { display: grid; grid-template-columns: 1fr 1fr; column-gap: 12px; }
+.image-options-grid .control-group { margin: 14px 0 5px; }
+.image-options-grid .control-group label { display: block; margin-bottom: 7px; font-size: 11px; font-weight: 600; }
+.check-row { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; margin-top: 9px; color: var(--muted); font-size: 11px; cursor: pointer; }
+.check-row input { accent-color: var(--accent); }
+.upload-field, .batch-zip { width: 100%; margin-top: 9px; }
 #workspace[data-quality="good"], #batch-workspace[data-quality="good"] { --quality-color: var(--good); }
 #workspace[data-quality="medium"], #batch-workspace[data-quality="medium"] { --quality-color: var(--warning); }
 #workspace[data-quality="low"], #batch-workspace[data-quality="low"] { --quality-color: var(--danger); }
@@ -98,7 +106,7 @@ input[type="range"]::-moz-range-thumb { width: 14px; height: 14px; border: 2px s
 .estimate-change.increase { color: var(--warning); }
 .estimate-sizes { margin-top: 3px; color: var(--text); font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .estimate small { display: block; margin-top: 3px; color: var(--muted); font-size: 10px; }
-.process-actions { display: flex; gap: 8px; margin-top: 18px; }
+.process-actions { position: sticky; bottom: 0; z-index: 2; display: flex; gap: 8px; margin-top: 18px; padding: 8px 0; background: var(--page); }
 .primary-button, .secondary-button { min-height: 40px; border: 1px solid transparent; border-radius: 5px; padding: 10px 13px; font-size: 13px; font-weight: 600; }
 .primary-button { width: 100%; background: var(--button); color: #fff; }
 .primary-button:hover:not(:disabled) { filter: brightness(1.1); }

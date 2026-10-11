@@ -20,7 +20,7 @@
       "128": "assets/icons/icon-128.png"
     }
   },
-  "permissions": [],
+  "permissions": ["activeTab", "scripting"],
   "content_security_policy": {
     "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'none'; connect-src 'self'; img-src 'self' blob: data:; style-src 'self';"
   }

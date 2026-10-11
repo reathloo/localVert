@@ -1,10 +1,12 @@
 import { locale, t } from './i18n.js';
 import { initPreferences } from './preferences.js';
-import { compressImage, compressPdf, estimatePdf, pdfPreview, validateFile, MAX_ESTIMATE_SIZE } from './conversion.js';
+import { compressImage, compressImageToTarget, compressPdf, estimatePdf, pdfPreview, validateFile, MAX_ESTIMATE_SIZE } from './conversion.js';
 import { imageToPdf, imagesToPdf, pdfToImagesZip, pdfToText } from './extra-conversion.js';
 import { docxToText, xlsxToCsv } from './office-conversion.js';
 import { officeToPdf, pptxToText } from './office-conversion.js';
 import { convertMedia, mediaSupport } from './media-conversion.js';
+import { zipBlobs } from './zip.js';
+import { fillUploadField } from './upload-field.js';
 
 const $ = (id) => document.getElementById(id);
 const quality = $('quality');
@@ -22,6 +24,7 @@ let downloadTimer;
 let downloadStarted = false;
 let progressMessage = null;
 let mergedPdf = null;
+let uploadTabId = Number(new URL(location.href).searchParams.get('sourceTab')) || null;
 const items = [];
 let nextItemId = 0;
 const MAX_BATCH_FILES = 20;
@@ -84,6 +87,23 @@ function settings() {
   return { strength, value: 100 - strength, isPdf, outputType: format.value };
 }
 
+function imageOptions() {
+  const raw = $('max-dimension').value.trim();
+  const maxDimension = raw ? Number(raw) : null;
+  if (raw && (!Number.isInteger(maxDimension) || maxDimension < 1 || maxDimension > 10000)) throw new Error(t('invalidDimension'));
+  return { maxDimension, rotation: Number($('rotation').value), squareCrop: $('square-crop').checked };
+}
+
+function targetBytesFor(source, outputType) {
+  const enabled = source.type.startsWith('image/') && outputType.startsWith('image/')
+    || source.type === 'application/pdf' && outputType === 'application/pdf';
+  const raw = enabled ? target.value.trim() : '';
+  if (!raw) return null;
+  const bytes = Number(raw.replace(',', '.')) * 1024 ** 2;
+  if (!Number.isFinite(bytes) || bytes <= 0) throw new Error(t('invalidTarget'));
+  return bytes;
+}
+
 function setFormats(type) {
   const options = availableFormats(type);
   format.replaceChildren(...options.map(([value, label]) => new Option(label, value)));
@@ -97,7 +117,7 @@ function stopEstimate() {
 }
 
 function setBusy(busy) {
-  for (const control of [quality, format, target, $('process')]) control.disabled = busy;
+  for (const control of [quality, format, target, $('max-dimension'), $('rotation'), $('square-crop'), $('process')]) control.disabled = busy;
   $('cancel').hidden = !busy;
   $('progress').hidden = !busy;
   $('estimate').hidden = busy || !file || !!result;
@@ -127,6 +147,9 @@ function clearResult() {
   $('result-preview').removeAttribute('src');
   previewUrls.splice(0).forEach((url) => URL.revokeObjectURL(url));
   $('app').classList.remove('has-result');
+  $('upload-field').hidden = true;
+  $('upload-warning').hidden = true;
+  $('upload-status').hidden = true;
 }
 
 function renderSettings() {
@@ -137,15 +160,17 @@ function renderSettings() {
   const isOffice = file.type.includes('officedocument');
   const isPdfText = isPdf && outputType === 'text/plain';
   const hasQuality = !isPdfText && !isOffice;
+  const isImageOutput = file.type.startsWith('image/') && outputType.startsWith('image/');
   $('quality-row').hidden = !hasQuality;
   $('format-row').hidden = false;
-  $('target-row').hidden = !isPdf || outputType !== 'application/pdf' || strength <= 30;
+  $('image-options').hidden = !isImageOutput;
+  $('target-row').hidden = !isImageOutput && (!isPdf || outputType !== 'application/pdf');
   $('pdf-notice').hidden = !isPdf && !isOffice && !isAudio && !isVideo && !['image/gif', 'image/tiff', 'image/heic'].includes(file.type);
   $('pdf-notice').textContent = isOffice ? t(outputType === 'application/pdf' ? 'officePdfNotice' : outputType === 'text/csv' ? 'xlsxNotice' : 'docxNotice')
     : isAudio || isVideo ? t('mediaNotice')
       : ['image/gif', 'image/tiff'].includes(file.type) ? t('firstFrameNotice')
         : file.type === 'image/heic' ? t('heicNotice')
-    : isPdfText ? t('pdfTextNotice') : outputType.includes('localvert-') ? t('pdfImageNotice') : t(strength <= 30 ? 'pdfOriginalNotice' : 'pdfRasterNotice');
+    : isPdfText ? t('pdfTextNotice') : outputType.includes('localvert-') ? t('pdfImageNotice') : t(strength <= 30 ? 'pdfStructureNotice' : 'pdfRasterNotice');
   $('file-name').textContent = file.name;
   $('file-name').title = file.name;
   $('file-size').textContent = formatBytes(file.size);
@@ -156,12 +181,14 @@ function renderSettings() {
   $('workspace').dataset.quality = level;
   $('quality-output').textContent = t(strength <= 30 ? 'gentle' : strength <= 65 ? 'balanced' : 'strong');
   quality.setAttribute('aria-valuetext', $('quality-output').textContent);
-  const unchangedPng = outputType === 'image/png' && imageCache && imageCache.sourceWidth === imageCache.width && imageCache.sourceHeight === imageCache.height;
-  $('quality-status').className = `quality-status quality-${unchangedPng ? 'good' : level}`;
-  $('quality-status').textContent = t(isAudio || isVideo ? 'mediaQualityNotice' : unchangedPng ? 'resolutionUnchanged' : isPdf && strength <= 30 ? 'qualityUnchanged'
+  const unchangedPng = outputType === 'image/png' && imageCache && imageCache.sourceWidth === imageCache.width && imageCache.sourceHeight === imageCache.height && !target.value;
+  const alreadyFits = isImageOutput && outputType === file.type && !$('max-dimension').value && !$('square-crop').checked && $('rotation').value === '0'
+    && Number(target.value.replace(',', '.')) * 1024 ** 2 >= file.size;
+  $('quality-status').className = `quality-status quality-${unchangedPng || alreadyFits ? 'good' : level}`;
+  $('quality-status').textContent = t(alreadyFits ? 'qualityUnchanged' : isAudio || isVideo ? 'mediaQualityNotice' : unchangedPng ? 'resolutionUnchanged' : isPdf && strength <= 30 ? 'qualityUnchanged'
     : outputType === 'image/png' ? (strength > 65 ? 'detailsMuchLower' : strength > 30 ? 'detailsReduced' : 'qualityHigh')
       : strength > 65 ? 'qualityMuchLower' : strength > 30 ? 'qualityReduced' : 'qualityHigh');
-  $('quality-warning').hidden = strength <= 65 || unchangedPng;
+  $('quality-warning').hidden = strength <= 65 || unchangedPng || alreadyFits;
   $('quality-warning').textContent = t(isAudio || isVideo ? 'mediaWarning' : isPdf ? 'pdfWarning' : outputType === 'image/png' ? 'pngWarning' : 'imageWarning');
 }
 
@@ -205,7 +232,7 @@ function renderResult() {
   if (!result) return;
   const { blob, source, targetBytes, sameFormat, keepOriginal, isPdf, reducedFurther, image } = result;
   const saved = source.size - blob.size;
-  const targetNote = targetBytes && blob.size > targetBytes ? t('targetMissed') : '';
+  const targetNote = targetBytes ? ` ${t(blob.size <= targetBytes ? 'targetReached' : 'targetNotReached')}` : '';
   $('result-stats').textContent = !sameFormat
     ? t('convertedResult', { result: formatBytes(blob.size), original: formatBytes(source.size), target: targetNote })
     : saved > 0
@@ -215,6 +242,7 @@ function renderResult() {
   if (isPdf && result.blob.type === 'text/plain') $('result-stats').textContent += t('pdfTextResult');
   if (source.type.includes('officedocument')) $('result-stats').textContent += t('officeResultWarning');
   if (reducedFurther && !keepOriginal) $('result-stats').textContent += t('targetAdjusted');
+  if (result.reason) $('result-stats').textContent += ` ${t(result.reason)}`;
   $('result-size').textContent = formatBytes(blob.size);
   $('download').textContent = t($('download').disabled ? 'downloadStarted' : downloadStarted ? 'downloadAgain' : 'download');
   $('download-status').textContent = t('downloadStatus');
@@ -223,6 +251,8 @@ function renderResult() {
   $('result-panel').hidden = false;
   $('app').classList.add('has-result');
   $('estimate').hidden = true;
+  $('upload-field').hidden = !uploadTabId;
+  $('upload-warning').hidden = !uploadTabId;
 }
 
 function render() {
@@ -243,7 +273,7 @@ function scheduleEstimate() {
   const config = settings();
   const isImage = source.type.startsWith('image/');
   const estimable = (config.isPdf && config.outputType === 'application/pdf') || (isImage && config.outputType !== 'application/pdf');
-  const key = !estimable ? 'noEstimate' : config.isPdf && config.value >= 70 ? 'original'
+  const key = !estimable || (isImage && target.value.trim()) ? 'noEstimate'
     : source.size > MAX_ESTIMATE_SIZE ? (config.isPdf ? 'largePdfEstimate' : 'largeImageEstimate') : 'calculating';
   estimateData = { key };
   render();
@@ -253,7 +283,7 @@ function scheduleEstimate() {
   estimateTimer = setTimeout(async () => {
     try {
       const data = config.isPdf ? await estimatePdf(source, config.value, controller.signal)
-        : await compressImage(source, config.outputType, config.value, controller.signal);
+        : await compressImage(source, config.outputType, config.value, controller.signal, imageOptions());
       if (controller.signal.aborted) return;
       if (config.isPdf) estimateData = data;
       else {
@@ -292,6 +322,12 @@ async function selectFiles(candidates) {
   if (errors.length) showError(errors.join(' · '));
   else $('error').hidden = true;
   if (!accepted.length) return;
+  if (!items.length) {
+    $('max-dimension').value = '';
+    $('rotation').value = '0';
+    $('square-crop').checked = false;
+    target.value = '';
+  }
   mergedPdf = null;
   if (items.length === 1) {
     items[0].outputType = format.value;
@@ -337,6 +373,8 @@ function renderBatch() {
   $('batch-pdf-notice').textContent = t(pdfRaster ? 'batchPdfNotice' : 'qualityMuchLower');
   $('batch-process').disabled = busy;
   $('batch-process').textContent = t(busy ? 'processing' : 'batchProcess');
+  $('batch-zip').hidden = !items.some((item) => item.result);
+  $('batch-zip').disabled = busy;
   $('batch-cancel').hidden = !busy;
   $('merge-actions').hidden = !items.every((item) => item.source.type.startsWith('image/'));
   $('merge-pdf').disabled = busy;
@@ -401,11 +439,15 @@ function batchResultText({ blob, source, keepOriginal, isPdf }) {
   return `${t('batchDone')} · ${formatBytes(source.size)} → ${formatBytes(blob.size)} (${difference})${warning}`;
 }
 
+function outputFilename(current) {
+  return current.filename ?? `${current.source.name.replace(/\.[^.]+$/, '')}${t(current.sameFormat ? 'fileSuffix' : 'convertedSuffix')}.${extensions[current.blob.type]}`;
+}
+
 function downloadResult(current) {
   const url = URL.createObjectURL(current.blob);
   const link = document.createElement('a');
   link.href = url;
-  link.download = current.filename ?? `${current.source.name.replace(/\.[^.]+$/, '')}${t(current.sameFormat ? 'fileSuffix' : 'convertedSuffix')}.${extensions[current.blob.type]}`;
+  link.download = outputFilename(current);
   document.body.append(link);
   link.click();
   link.remove();
@@ -500,6 +542,29 @@ $('batch-quality').addEventListener('input', () => {
   for (const item of items) { item.result = null; item.error = ''; item.status = 'batchReady'; item.downloaded = false; item.downloadBlocked = false; }
   renderBatch();
 });
+$('batch-zip').addEventListener('click', async () => {
+  if (operation) return;
+  const ready = items.filter((item) => item.result);
+  if (!ready.length) return showError(t('zipNoResults'));
+  const controller = new AbortController();
+  operation = controller;
+  $('batch-progress').hidden = false;
+  $('batch-progress').textContent = t('processingLocal');
+  renderBatch();
+  try {
+    const names = new Map();
+    const entries = ready.map((item) => {
+      const name = outputFilename(item.result);
+      const count = (names.get(name) || 0) + 1;
+      names.set(name, count);
+      return { name: count === 1 ? name : name.replace(/(\.[^.]+)$/, `-${count}$1`), blob: item.result.blob };
+    });
+    const blob = await zipBlobs(entries, controller.signal);
+    downloadResult({ blob, filename: 'localvert-results.zip' });
+    $('batch-progress').textContent = ready.length === items.length ? t('zipStarted') : t('zipPartial', { count: ready.length, total: items.length });
+  } catch (error) { if (!controller.signal.aborted) showError(error instanceof Error ? error.message : t('processingError')); }
+  finally { operation = null; renderBatch(); }
+});
 $('batch-cancel').addEventListener('click', () => operation?.abort());
 $('merge-pdf').addEventListener('click', async () => {
   if (operation || items.length < 2 || !items.every((item) => item.source.type.startsWith('image/'))) return;
@@ -537,13 +602,16 @@ $('merge-download').addEventListener('click', () => {
 });
 quality.addEventListener('input', changed);
 format.addEventListener('change', changed);
-target.addEventListener('input', () => { clearResult(); if (items.length === 1) items[0].result = null; $('error').hidden = true; renderEstimate(); });
+for (const id of ['max-dimension', 'rotation', 'square-crop']) $(id).addEventListener('change', changed);
+target.addEventListener('input', () => { clearResult(); if (items.length === 1) items[0].result = null; $('error').hidden = true; scheduleEstimate(); });
 $('cancel').addEventListener('click', changed);
 
-async function convert(source, outputType, strength, targetBytes, cached, signal, updateProgress) {
+async function convert(source, outputType, strength, targetBytes, cached, signal, updateProgress, options = {}) {
   const value = 100 - strength;
+  const transformed = !!(options.maxDimension || options.rotation || options.squareCrop);
   const image = source.type.startsWith('image/') && outputType.startsWith('image/')
-    ? cached ?? await compressImage(source, outputType, value, signal) : null;
+    ? cached ?? (targetBytes && source.type === outputType && source.size <= targetBytes && !transformed ? { blob: source, targetMet: true }
+      : targetBytes ? await compressImageToTarget(source, outputType, targetBytes, signal, options) : await compressImage(source, outputType, value, signal, options)) : null;
   const conversion = image ?? (source.type === 'application/pdf' && outputType.includes('localvert-')
     ? { blob: await pdfToImagesZip(source, outputType.includes('png-pages') ? 'image/png' : 'image/jpeg', strength, signal, updateProgress) }
     : source.type === 'application/pdf' && outputType === 'application/pdf'
@@ -556,8 +624,8 @@ async function convert(source, outputType, strength, targetBytes, cached, signal
               : source.type.includes('presentationml') ? await pptxToText(source, signal) : await docxToText(source, signal) });
   signal.throwIfAborted();
   const sameFormat = source.type === outputType;
-  const keepOriginal = sameFormat && conversion.blob.size >= source.size;
-  return { blob: keepOriginal ? source : conversion.blob, source, sameFormat, keepOriginal, targetBytes, isPdf: source.type === 'application/pdf', reducedFurther: conversion.reducedFurther, image };
+  const keepOriginal = sameFormat && !transformed && conversion.blob.size >= source.size;
+  return { blob: keepOriginal ? source : conversion.blob, source, sameFormat, keepOriginal, targetBytes, isPdf: source.type === 'application/pdf', reducedFurther: conversion.reducedFurther, reason: conversion.reason, image };
 }
 
 $('batch-process').addEventListener('click', async () => {
@@ -598,9 +666,12 @@ $('process').addEventListener('click', async () => {
   if (!file || operation) return;
   const source = file;
   const config = settings();
-  const targetText = config.isPdf && config.outputType === 'application/pdf' && config.value < 70 ? target.value.trim() : '';
-  const targetBytes = targetText ? Number(targetText.replace(',', '.')) * 1024 ** 2 : null;
-  if (targetText && (!Number.isFinite(targetBytes) || targetBytes <= 0)) return showError(t('invalidTarget'));
+  let targetBytes;
+  let options = {};
+  try {
+    targetBytes = targetBytesFor(source, config.outputType);
+    if (source.type.startsWith('image/') && config.outputType.startsWith('image/')) options = imageOptions();
+  } catch (error) { return showError(error.message); }
   const cached = imageCache;
   stopEstimate();
   clearResult();
@@ -615,7 +686,7 @@ $('process').addEventListener('click', async () => {
   setBusy(true);
   updateProgress('processingLocal');
   try {
-    result = await convert(source, config.outputType, config.strength, targetBytes, cached, controller.signal, updateProgress);
+    result = await convert(source, config.outputType, config.strength, targetBytes, targetBytes ? null : cached, controller.signal, updateProgress, options);
     const { image, keepOriginal } = result;
     if (image) { imageCache = image; renderSettings(); }
     renderResult();
@@ -660,6 +731,44 @@ $('download').addEventListener('click', () => {
     $('download').disabled = false;
     renderResult();
   }, 2000);
+});
+
+const extensionApi = globalThis.browser ?? globalThis.chrome;
+extensionApi?.runtime?.onMessage?.addListener((message) => {
+  if (message?.type === 'localVertSourceTab' && Number.isInteger(message.tabId)) {
+    uploadTabId = message.tabId;
+    if (result) renderResult();
+  }
+});
+
+$('upload-field').addEventListener('click', async () => {
+  if (!result || !uploadTabId) return;
+  const status = $('upload-status');
+  status.hidden = false;
+  if (result.blob.size > 2 * 1024 ** 2) { status.textContent = t('uploadTooLarge'); return; }
+  const api = globalThis.browser ?? globalThis.chrome;
+  if (!api?.scripting?.executeScript) { status.textContent = t('uploadUnavailable'); return; }
+  $('upload-field').disabled = true;
+  try {
+    const base64 = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result).split(',')[1]);
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(result.blob);
+    });
+    const filename = outputFilename(result);
+    const [{ result: filled }] = await api.scripting.executeScript({
+      target: { tabId: uploadTabId },
+      func: fillUploadField,
+      args: [base64, filename, result.blob.type],
+    });
+    status.textContent = t(filled ? 'uploadDone' : 'uploadNoField');
+    if (filled) {
+      try { await api.tabs.update(uploadTabId, { active: true }); }
+      catch { /* The file was inserted; switching tabs is only a convenience. */ }
+    }
+  } catch { status.textContent = t('uploadFailed'); }
+  finally { $('upload-field').disabled = false; }
 });
 
 initPreferences(render, showError);

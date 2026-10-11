@@ -225,6 +225,39 @@ export const messages = {
   },
 };
 
+Object.assign(messages.en, {
+  imageAdjust: 'Adjust image', maxDimension: 'Longest edge (px)', autoSize: 'Auto', rotate: 'Rotate', noRotation: 'No rotation', squareCrop: 'Center crop to square',
+  invalidCrop: 'Invalid image dimensions or crop.', invalidDimension: 'Enter a longest edge between 1 and 10000 px.',
+  targetReached: 'Target met.', targetNotReached: 'Target not met; best local result shown.',
+  pdfComplexKept: 'This PDF may contain forms or signatures; original kept.', pdfNoStructuralSaving: 'No safe PDF saving; original kept.', pdfLargeKept: 'Large PDF kept unchanged to protect memory.', pdfStructureNotice: 'Keeps selectable text and vector pages where possible. Signed or interactive PDFs stay unchanged.',
+  downloadZip: 'Download all as ZIP', zipNoResults: 'Process at least one file first.', zipPartial: '{count} of {total} results included; failed files were skipped.', zipStarted: 'ZIP download started ✓',
+  useInUpload: 'Use in upload field', uploadWarning: 'The website may upload the file immediately after insertion.', uploadUnavailable: 'Available only as an installed extension on a normal web page.', uploadTooLarge: 'For direct upload, the result must be 2 MB or smaller. Download it instead.', uploadNoField: 'No compatible file field found on the original page. Download and select the file there.', uploadDone: 'File inserted into the upload field. Check the form before submitting.', uploadFailed: 'Could not fill the upload field. Download and select the file manually.',
+});
+Object.assign(messages.de, {
+  imageAdjust: 'Bild anpassen', maxDimension: 'Längste Kante (px)', autoSize: 'Automatisch', rotate: 'Drehen', noRotation: 'Nicht drehen', squareCrop: 'Mittig quadratisch zuschneiden',
+  invalidCrop: 'Ungültige Bildmaße oder ungültiger Zuschnitt.', invalidDimension: 'Bitte eine längste Kante zwischen 1 und 10000 px eingeben.',
+  targetReached: 'Ziel erreicht.', targetNotReached: 'Ziel nicht erreicht; bestes lokales Ergebnis angezeigt.',
+  pdfComplexKept: 'Dieses PDF kann Formulare oder Signaturen enthalten; Original bleibt.', pdfNoStructuralSaving: 'Keine sichere PDF-Einsparung; Original bleibt.', pdfLargeKept: 'Großes PDF bleibt zum Schutz des Speichers unverändert.', pdfStructureNotice: 'Auswählbarer Text und Vektorseiten bleiben nach Möglichkeit erhalten. Signierte und interaktive PDFs bleiben unverändert.',
+  downloadZip: 'Alle als ZIP herunterladen', zipNoResults: 'Bitte zuerst mindestens eine Datei verarbeiten.', zipPartial: '{count} von {total} Ergebnissen enthalten; fehlgeschlagene Dateien wurden ausgelassen.', zipStarted: 'ZIP-Download gestartet ✓',
+  useInUpload: 'In Upload-Feld einsetzen', uploadWarning: 'Die Website kann die Datei nach dem Einsetzen sofort hochladen.', uploadUnavailable: 'Nur als installierte Erweiterung auf einer normalen Webseite verfügbar.', uploadTooLarge: 'Für direktes Einsetzen darf das Ergebnis höchstens 2 MB groß sein. Bitte herunterladen.', uploadNoField: 'Auf der ursprünglichen Seite wurde kein passendes Datei-Feld gefunden. Bitte herunterladen und dort auswählen.', uploadDone: 'Datei ins Upload-Feld eingesetzt. Bitte Formular vor dem Absenden prüfen.', uploadFailed: 'Upload-Feld konnte nicht gefüllt werden. Bitte Datei herunterladen und manuell auswählen.',
+});
+Object.assign(messages.es, {
+  imageAdjust: 'Ajustar imagen', maxDimension: 'Lado mayor (px)', autoSize: 'Automático', rotate: 'Girar', noRotation: 'Sin giro', squareCrop: 'Recortar al centro en cuadrado',
+  invalidCrop: 'Dimensiones o recorte no válidos.', invalidDimension: 'Introduce un lado mayor entre 1 y 10000 px.',
+  targetReached: 'Objetivo alcanzado.', targetNotReached: 'Objetivo no alcanzado; se muestra el mejor resultado local.',
+  pdfComplexKept: 'Este PDF puede tener formularios o firmas; se conserva el original.', pdfNoStructuralSaving: 'No hay ahorro seguro en PDF; se conserva el original.', pdfLargeKept: 'PDF grande conservado para proteger la memoria.', pdfStructureNotice: 'Conserva texto seleccionable y vectores cuando es posible. PDF firmados o interactivos no se modifican.',
+  downloadZip: 'Descargar todo como ZIP', zipNoResults: 'Procesa al menos un archivo primero.', zipPartial: '{count} de {total} resultados incluidos; se omitieron los fallidos.', zipStarted: 'Descarga ZIP iniciada ✓',
+  useInUpload: 'Usar en campo de carga', uploadWarning: 'El sitio puede subir el archivo inmediatamente después de insertarlo.', uploadUnavailable: 'Solo disponible como extensión instalada en una página web normal.', uploadTooLarge: 'Para la carga directa, el resultado debe ser de 2 MB o menos. Descárgalo.', uploadNoField: 'No se encontró un campo de archivo compatible en la página original. Descarga y selecciona allí el archivo.', uploadDone: 'Archivo insertado en el campo de carga. Revisa el formulario antes de enviarlo.', uploadFailed: 'No se pudo rellenar el campo de carga. Descarga y selecciona el archivo manualmente.',
+});
+Object.assign(messages.fr, {
+  imageAdjust: 'Ajuster l’image', maxDimension: 'Côté le plus long (px)', autoSize: 'Automatique', rotate: 'Rotation', noRotation: 'Aucune rotation', squareCrop: 'Recadrer au centre en carré',
+  invalidCrop: 'Dimensions ou recadrage invalides.', invalidDimension: 'Saisissez un côté entre 1 et 10000 px.',
+  targetReached: 'Objectif atteint.', targetNotReached: 'Objectif non atteint ; meilleur résultat local affiché.',
+  pdfComplexKept: 'Ce PDF peut contenir des formulaires ou signatures ; original conservé.', pdfNoStructuralSaving: 'Aucun gain PDF sûr ; original conservé.', pdfLargeKept: 'PDF volumineux conservé pour protéger la mémoire.', pdfStructureNotice: 'Préserve le texte sélectionnable et les vecteurs si possible. Les PDF signés ou interactifs restent inchangés.',
+  downloadZip: 'Tout télécharger en ZIP', zipNoResults: 'Traitez au moins un fichier avant.', zipPartial: '{count} résultats sur {total} inclus ; échecs ignorés.', zipStarted: 'Téléchargement ZIP lancé ✓',
+  useInUpload: 'Utiliser dans le champ de dépôt', uploadWarning: 'Le site peut envoyer le fichier immédiatement après son insertion.', uploadUnavailable: 'Disponible uniquement comme extension installée sur une page web normale.', uploadTooLarge: 'Pour le dépôt direct, le résultat doit faire 2 Mo ou moins. Téléchargez-le.', uploadNoField: 'Aucun champ de fichier compatible trouvé sur la page initiale. Téléchargez puis sélectionnez le fichier.', uploadDone: 'Fichier inséré dans le champ de dépôt. Vérifiez le formulaire avant envoi.', uploadFailed: 'Impossible de remplir le champ de dépôt. Téléchargez et sélectionnez le fichier manuellement.',
+});
+
 export function localeFromLanguages(languages) {
   for (const language of languages) {
     const code = String(language || '').toLowerCase().split(/[-_]/)[0];

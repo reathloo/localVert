@@ -29,6 +29,7 @@ class PackageTests(unittest.TestCase):
                 self.assertIn("vendor/generated/tiff-vendor.js", names)
                 self.assertIn("src/media-conversion.js", names)
                 self.assertIn("src/zip.js", names)
+                self.assertIn("src/upload-field.js", names)
                 self.assertFalse(any(name.startswith(("tests/", "assets/icon-concepts/", "dist/")) for name in names))
                 self.assertEqual(archive.read("manifest.json"), (ROOT / "manifest.json").read_bytes())
 

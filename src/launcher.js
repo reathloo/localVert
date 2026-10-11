@@ -9,13 +9,16 @@ import { locale, t } from './i18n.js';
   try {
     const api = globalThis.browser ?? globalThis.chrome;
     const url = api.runtime.getURL('index.html');
+    const [activeTab] = await api.tabs.query({ active: true, currentWindow: true });
+    const sourceTab = activeTab?.id && /^https?:/.test(activeTab.url || '') ? activeTab.id : null;
     const windows = await api.windows.getAll({ populate: true });
     const existing = windows.find((item) => item.tabs?.some((tab) => tab.url === url));
     if (existing) {
       await api.windows.update(existing.id, { focused: true });
+      if (sourceTab) await api.runtime.sendMessage({ type: 'localVertSourceTab', tabId: sourceTab });
     } else {
       await api.windows.create({
-        url,
+        url: sourceTab ? `${url}?sourceTab=${sourceTab}` : url,
         type: 'popup',
         width: 450,
         height: 680,
