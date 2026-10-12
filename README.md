@@ -10,13 +10,14 @@ Das Farbschema folgt zunächst automatisch dem hellen oder dunklen Browser-/Syst
 
 - JPG, PNG und WebP komprimieren und ineinander konvertieren; GIF (erstes Bild), TIFF (erste Seite), AVIF und HEIC als Eingaben. AVIF-Ausgabe und HEIC-Eingabe hängen vom Browser ab.
 - Bei Bildern längste Kante, Drehung und mittigen quadratischen Zuschnitt einstellen. Neu kodierte Bilder enthalten keine ursprünglichen EXIF-Standortdaten; das Original bleibt unangetastet.
+- Im aufklappbaren Bereich „Bild/PDF anpassen“ optional eine Zielgröße setzen und den Ausgabedateinamen ändern. Die passende Dateiendung wird ergänzt; die Originaldatei wird nicht umbenannt.
 - Ein oder mehrere Bilder als PDF ausgeben; Transparenz wird weiß hinterlegt. PDF-Seiten als JPG/PNG in einem ZIP exportieren.
 - PDF im schonenden Modus strukturerhaltend neu speichern, wenn dabei Platz gespart wird. PDFs mit erkennbaren Formularen/Signaturen sowie nicht kleinere Ergebnisse bleiben unverändert. Alternativ bildbasierte PDF neu erzeugen; auswählbaren PDF-Text als TXT exportieren.
 - Für bildbasierte PDFs optional eine Zielgröße in MB angeben; bis zu drei Qualitätsstufen werden lokal getestet
 - MP3, WAV, OGG/Opus und FLAC lokal umwandeln oder komprimieren, soweit der Browser die nötigen Codecs bereitstellt.
 - MP4 und WebM lokal umwandeln oder komprimieren, soweit der Browser die nötigen Codecs bereitstellt.
 - DOCX als TXT, das erste XLSX-Blatt als CSV, PPTX als TXT sowie DOCX/XLSX/PPTX als vereinfachtes PDF exportieren.
-- Bis zu 20 Dateien gemeinsam auswählen oder hinzufügen und nacheinander lokal verarbeiten; Ausgabeformat und Download pro Datei oder ein gemeinsames ZIP bis 200 MB
+- Bis zu 20 Dateien gemeinsam auswählen oder per Drag-and-drop irgendwo im Add-on-Fenster ablegen und nacheinander lokal verarbeiten; Ausgabeformat und Download pro Datei oder ein gemeinsames ZIP bis 200 MB
 - Optional nach einem Klick ein Ergebnis bis 2 MB in ein eindeutiges, passendes Datei-Upload-Feld der ursprünglich geöffneten Webseite einsetzen. localVert sendet es nicht selbst; die Webseite kann nach dem Einsetzen allerdings sofort einen Upload starten. Wenn kein passendes Feld gefunden wird, bleibt der normale Download verfügbar.
 - Tatsächliche Größe und Vorher/Nachher-Vorschau der ersten PDF-Seite anzeigen
 - Ergebnis lokal herunterladen

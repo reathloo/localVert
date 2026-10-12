@@ -15,6 +15,7 @@ REQUIRED_BUNDLES = {
     "src/media-conversion.js",
     "src/zip.js",
     "src/upload-field.js",
+    "src/file-drop.js",
     "vendor/generated/media-vendor.js",
     "vendor/generated/tiff-vendor.js",
     "vendor/generated/media-vendor.js.LEGAL.txt",

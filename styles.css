@@ -51,7 +51,11 @@ h1 { margin: 0; font-size: 23px; font-weight: 650; letter-spacing: -.8px; }
 .preference-menu button[aria-pressed="true"] { color: var(--accent); font-weight: 600; }
 .preference-menu button[aria-pressed="true"]::after { content: "✓"; }
 .dropzone { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; min-height: 190px; padding: 18px; border: 1px dashed var(--border); border-radius: 7px; background: var(--surface); cursor: pointer; text-align: center; }
-.dropzone:hover, .dropzone.dragging { border-color: var(--accent); background: var(--hover); }
+.dropzone:hover { border-color: var(--accent); background: var(--hover); }
+.drop-overlay { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; padding: 20px; background: var(--page); opacity: .97; pointer-events: none; }
+.drop-overlay > div { display: flex; flex-direction: column; align-items: center; gap: 12px; width: 100%; max-width: 390px; padding: 45px 20px; border: 2px dashed var(--accent); border-radius: 7px; background: var(--surface); color: var(--text); text-align: center; }
+.drop-overlay .drop-icon { width: 34px; height: 34px; margin: 0; color: var(--accent); }
+.drop-overlay strong { font-size: 15px; font-weight: 600; }
 .drop-icon { width: 30px; height: 30px; margin-bottom: 8px; color: var(--muted); stroke-width: 1.2; }
 .dropzone strong { font-size: 14px; font-weight: 600; }
 .dropzone span { font-size: 12px; color: var(--muted); }
@@ -74,8 +78,13 @@ h1 { margin: 0; font-size: 23px; font-weight: 650; letter-spacing: -.8px; }
 .format-row { display: grid; grid-template-columns: 1fr 1.1fr; align-items: center; gap: 14px; }
 .format-row > label { margin: 0; }
 select, input[type="text"], input[type="number"] { width: 100%; min-width: 0; padding: 9px 10px; border: 1px solid var(--border); border-radius: 5px; color: var(--text); background: var(--surface); font-size: 12px; }
-#image-options { margin: 12px 0; border-top: 1px solid var(--border); }
-#image-options summary { padding: 12px 0 0; color: var(--accent); font-size: 12px; cursor: pointer; }
+#adjust-options { margin: 12px 0; border-top: 1px solid var(--border); }
+#adjust-options summary { padding: 12px 0 0; color: var(--accent); font-size: 12px; cursor: pointer; }
+#adjust-options summary::marker { color: var(--muted); }
+.adjust-summary { float: right; margin-left: 8px; color: var(--text); font-variant-numeric: tabular-nums; font-weight: 600; }
+.adjust-field { margin-top: 14px; }
+.adjust-field:last-child { margin-bottom: 10px; }
+.adjust-field > label { display: block; margin-bottom: 7px; font-size: 11px; font-weight: 600; }
 .image-options-grid { display: grid; grid-template-columns: 1fr 1fr; column-gap: 12px; }
 .image-options-grid .control-group { margin: 14px 0 5px; }
 .image-options-grid .control-group label { display: block; margin-bottom: 7px; font-size: 11px; font-weight: 600; }

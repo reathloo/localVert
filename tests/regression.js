@@ -6,6 +6,7 @@ import { convertMedia, mediaSupport } from '../src/media-conversion.js';
 import { ALL_FORMATS, BlobSource, Input } from '../vendor/generated/media-vendor.js';
 import { zipBlobs } from '../src/zip.js';
 import { fillUploadField } from '../src/upload-field.js';
+import { installFileDrop } from '../src/file-drop.js';
 
 const output = document.querySelector('#results');
 const assert = (condition, message) => { if (!condition) throw new Error(message); };
@@ -60,6 +61,25 @@ async function run(files) {
   await check('File detection works without MIME type or extension', async () => {
     const normalized = await validateFile(new File([png], 'image-no-extension', { type: '' }));
     assert(normalized.type === 'image/png' && normalized.size === png.size, 'Incorrect normalization');
+  });
+  await check('Whole-window drop accepts files and ignores text', () => {
+    const root = document.createElement('div');
+    const overlay = document.createElement('div');
+    overlay.hidden = true;
+    let received = [];
+    const dispose = installFileDrop(root, overlay, (files) => { received = files; });
+    try {
+      const textDrop = new DataTransfer();
+      textDrop.setData('text/plain', 'not a file');
+      root.dispatchEvent(new DragEvent('dragenter', { bubbles: true, cancelable: true, dataTransfer: textDrop }));
+      assert(overlay.hidden, 'Text drag opened the overlay');
+      const transfer = new DataTransfer();
+      transfer.items.add(new File([png], 'dropped.png', { type: 'image/png' }));
+      root.dispatchEvent(new DragEvent('dragenter', { bubbles: true, cancelable: true, dataTransfer: transfer }));
+      assert(!overlay.hidden, 'File drag did not open the overlay');
+      root.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: transfer }));
+      assert(overlay.hidden && received.length === 1 && received[0].name === 'dropped.png', 'Dropped file was not accepted');
+    } finally { dispose(); }
   });
   for (const name of ['invalid.jpg', 'empty.png']) {
     await check(`Reject ${name}`, async () => {

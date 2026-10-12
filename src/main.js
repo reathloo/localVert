@@ -7,11 +7,13 @@ import { officeToPdf, pptxToText } from './office-conversion.js';
 import { convertMedia, mediaSupport } from './media-conversion.js';
 import { zipBlobs } from './zip.js';
 import { fillUploadField } from './upload-field.js';
+import { installFileDrop } from './file-drop.js';
 
 const $ = (id) => document.getElementById(id);
 const quality = $('quality');
 const format = $('format');
 const target = $('target-size');
+const outputName = $('output-name');
 let file = null;
 let result = null;
 let operation = null;
@@ -104,6 +106,23 @@ function targetBytesFor(source, outputType) {
   return bytes;
 }
 
+function customFilename(type) {
+  const name = outputName.value.trim();
+  if (!name) return null;
+  if (/[\\/:*?"<>|\x00-\x1f]/.test(name) || /[. ]$/.test(name)) throw new Error(t('invalidOutputName'));
+  const extension = extensions[type];
+  if (!extension) throw new Error(t('invalidOutputName'));
+  const base = name.replace(new RegExp(`\\.${extension}$`, 'i'), '');
+  if (!base || /^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i.test(base)) throw new Error(t('invalidOutputName'));
+  return `${base}.${extension}`;
+}
+
+function applyOutputName(current) {
+  const filename = customFilename(current.blob.type);
+  if (filename) current.filename = filename;
+  else delete current.filename;
+}
+
 function setFormats(type) {
   const options = availableFormats(type);
   format.replaceChildren(...options.map(([value, label]) => new Option(label, value)));
@@ -117,7 +136,7 @@ function stopEstimate() {
 }
 
 function setBusy(busy) {
-  for (const control of [quality, format, target, $('max-dimension'), $('rotation'), $('square-crop'), $('process')]) control.disabled = busy;
+  for (const control of [quality, format, target, outputName, $('max-dimension'), $('rotation'), $('square-crop'), $('process')]) control.disabled = busy;
   $('cancel').hidden = !busy;
   $('progress').hidden = !busy;
   $('estimate').hidden = busy || !file || !!result;
@@ -163,8 +182,15 @@ function renderSettings() {
   const isImageOutput = file.type.startsWith('image/') && outputType.startsWith('image/');
   $('quality-row').hidden = !hasQuality;
   $('format-row').hidden = false;
-  $('image-options').hidden = !isImageOutput;
+  const isImage = file.type.startsWith('image/');
+  $('adjust-options').hidden = !isImage && !isPdf;
+  $('adjust-label').textContent = t(isPdf ? 'pdfAdjust' : 'imageAdjust');
+  $('image-controls').hidden = !isImageOutput;
   $('target-row').hidden = !isImageOutput && (!isPdf || outputType !== 'application/pdf');
+  const targetText = target.value.trim();
+  const summary = [targetText ? t('targetSizeSummary', { size: targetText }) : '', outputName.value.trim() ? t('renamedSummary') : ''].filter(Boolean).join(' · ');
+  $('adjust-summary').hidden = !summary;
+  $('adjust-summary').textContent = summary;
   $('pdf-notice').hidden = !isPdf && !isOffice && !isAudio && !isVideo && !['image/gif', 'image/tiff', 'image/heic'].includes(file.type);
   $('pdf-notice').textContent = isOffice ? t(outputType === 'application/pdf' ? 'officePdfNotice' : outputType === 'text/csv' ? 'xlsxNotice' : 'docxNotice')
     : isAudio || isVideo ? t('mediaNotice')
@@ -327,6 +353,8 @@ async function selectFiles(candidates) {
     $('rotation').value = '0';
     $('square-crop').checked = false;
     target.value = '';
+    outputName.value = '';
+    $('adjust-options').open = false;
   }
   mergedPdf = null;
   if (items.length === 1) {
@@ -355,6 +383,7 @@ function showItems() {
   format.value = items[0].outputType;
   quality.value = $('batch-quality').value;
   target.value = '';
+  outputName.value = items[0].result?.filename?.replace(/\.[^.]+$/, '') ?? '';
   if (items[0].result) { result = items[0].result; render(); }
   else scheduleEstimate();
 }
@@ -474,13 +503,7 @@ $('file-input').addEventListener('change', (event) => {
   selectFiles([...event.target.files]);
   event.target.value = '';
 });
-for (const name of ['dragenter', 'dragover', 'dragleave', 'drop']) {
-  $('dropzone').addEventListener(name, (event) => {
-    event.preventDefault();
-    $('dropzone').classList.toggle('dragging', name === 'dragenter' || name === 'dragover');
-    if (name === 'drop') selectFiles([...event.dataTransfer.files]);
-  });
-}
+installFileDrop(window, $('drop-overlay'), selectFiles);
 $('remove-file').addEventListener('click', () => {
   selectionVersion += 1;
   stopOperation();
@@ -601,9 +624,22 @@ $('merge-download').addEventListener('click', () => {
   }, 2000);
 });
 quality.addEventListener('input', changed);
-format.addEventListener('change', changed);
+format.addEventListener('change', () => {
+  const supportsTarget = file?.type.startsWith('image/') && format.value.startsWith('image/')
+    || file?.type === 'application/pdf' && format.value === 'application/pdf';
+  if (!supportsTarget) target.value = '';
+  changed();
+});
 for (const id of ['max-dimension', 'rotation', 'square-crop']) $(id).addEventListener('change', changed);
 target.addEventListener('input', () => { clearResult(); if (items.length === 1) items[0].result = null; $('error').hidden = true; scheduleEstimate(); });
+outputName.addEventListener('input', () => {
+  $('error').hidden = true;
+  if (result) {
+    try { applyOutputName(result); }
+    catch (error) { showError(error.message); }
+  }
+  renderSettings();
+});
 $('cancel').addEventListener('click', changed);
 
 async function convert(source, outputType, strength, targetBytes, cached, signal, updateProgress, options = {}) {
@@ -671,6 +707,7 @@ $('process').addEventListener('click', async () => {
   try {
     targetBytes = targetBytesFor(source, config.outputType);
     if (source.type.startsWith('image/') && config.outputType.startsWith('image/')) options = imageOptions();
+    if (outputName.value.trim()) customFilename(config.outputType.includes('localvert-') ? 'application/zip' : config.outputType);
   } catch (error) { return showError(error.message); }
   const cached = imageCache;
   stopEstimate();
@@ -687,6 +724,7 @@ $('process').addEventListener('click', async () => {
   updateProgress('processingLocal');
   try {
     result = await convert(source, config.outputType, config.strength, targetBytes, targetBytes ? null : cached, controller.signal, updateProgress, options);
+    applyOutputName(result);
     const { image, keepOriginal } = result;
     if (image) { imageCache = image; renderSettings(); }
     renderResult();
@@ -720,6 +758,8 @@ $('process').addEventListener('click', async () => {
 
 $('download').addEventListener('click', () => {
   if (!result || $('download').disabled) return;
+  try { applyOutputName(result); }
+  catch (error) { return showError(error.message); }
   const current = result;
   downloadResult(result);
   downloadStarted = true;
@@ -743,6 +783,8 @@ extensionApi?.runtime?.onMessage?.addListener((message) => {
 
 $('upload-field').addEventListener('click', async () => {
   if (!result || !uploadTabId) return;
+  try { applyOutputName(result); }
+  catch (error) { return showError(error.message); }
   const status = $('upload-status');
   status.hidden = false;
   if (result.blob.size > 2 * 1024 ** 2) { status.textContent = t('uploadTooLarge'); return; }
