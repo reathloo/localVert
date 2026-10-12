@@ -2,7 +2,6 @@ export const messages = {
   en: {
     officePdfNotice: 'Local PDF with reflowed text as image pages. Layout, images, formulas and slide graphics may be lost; text is not searchable.',
     mediaNotice: 'Local conversion; available codecs depend on this browser.',
-    mediaQualityNotice: 'Stronger compression lowers bitrate and may reduce video resolution.',
     mediaWarning: 'Strong settings can noticeably reduce sound and picture quality.',
     mediaCodecUnavailable: 'This browser cannot encode this format locally.',
     mediaReadError: 'This browser cannot read or convert this media file.',
@@ -32,7 +31,7 @@ export const messages = {
     appName: 'Local Converter', eyebrow: 'PRIVATE · OFFLINE', intro: 'Convert and optimize files locally.', languageButton: 'Language: {language}', autoLanguage: 'Automatic', languageSaveError: 'Could not save the language choice in this browser.', themeButton: 'Color theme: {theme}', autoTheme: 'Automatic', lightTheme: 'Light', darkTheme: 'Dark', themeSaveError: 'Could not save the theme choice in this browser.',
     chooseFile: 'Choose a file', dropFile: 'Drop a file here', orChoose: 'or click to choose', supportedFormats: 'Images, PDF, audio, video and Office', removeFile: 'Remove file',
     compressionStrength: 'Compression strength', gentle: 'Gentle', balanced: 'Balanced', strong: 'Strong', gentleHint: 'Gentle · high quality', strongHint: 'Strong · lower quality',
-    qualityHigh: 'Quality: high', qualityUnchanged: 'Quality: unchanged', qualityReduced: 'Quality: reduced', qualityMuchLower: 'Quality: much lower', detailsReduced: 'Details: may be reduced', detailsMuchLower: 'Details: may be greatly reduced', resolutionUnchanged: 'Resolution: unchanged',
+    qualityMuchLower: 'Quality: much lower',
     outputFormat: 'Output format', pngLossless: 'PNG (lossless)', targetSize: 'Target size (MB, optional)', targetPlaceholder: 'e.g. 2.5',
     process: 'Process locally', processing: 'Processing…', download: 'Download result', downloadStarted: 'Download started ✓', downloadAgain: 'Download again', downloadStatus: 'Download started. Check your Downloads folder.',
     original: 'Original', result: 'Result', originalPreview: 'Original file preview', resultPreview: 'Result preview', footer: 'Your files stay on your device.', opening: 'Opening converter…', openingFailed: 'Could not open the window. Please reload the extension.',
@@ -58,7 +57,6 @@ export const messages = {
   de: {
     officePdfNotice: 'Lokales PDF mit neu gesetztem Text als Bildseiten. Layout, Bilder, Formeln und Foliengrafiken können entfallen; Text ist nicht durchsuchbar.',
     mediaNotice: 'Lokale Umwandlung; verfügbare Codecs hängen vom Browser ab.',
-    mediaQualityNotice: 'Stärkere Komprimierung senkt die Bitrate und ggf. die Videoauflösung.',
     mediaWarning: 'Starke Einstellungen können Klang und Bild deutlich verschlechtern.',
     mediaCodecUnavailable: 'Dieser Browser kann dieses Format lokal nicht kodieren.',
     mediaReadError: 'Dieser Browser kann diese Mediendatei nicht lokal lesen oder umwandeln.',
@@ -88,7 +86,7 @@ export const messages = {
     appName: 'Lokal Konverter', eyebrow: 'PRIVAT · OFFLINE', intro: 'Dateien lokal konvertieren und optimieren.', languageButton: 'Sprache: {language}', autoLanguage: 'Automatisch', languageSaveError: 'Die Sprachauswahl konnte in diesem Browser nicht gespeichert werden.', themeButton: 'Farbschema: {theme}', autoTheme: 'Automatisch', lightTheme: 'Hell', darkTheme: 'Dunkel', themeSaveError: 'Das Farbschema konnte in diesem Browser nicht gespeichert werden.',
     chooseFile: 'Datei auswählen', dropFile: 'Datei hier ablegen', orChoose: 'oder klicken zum Auswählen', supportedFormats: 'Bilder, PDF, Audio, Video und Office', removeFile: 'Datei entfernen',
     compressionStrength: 'Komprimierungsstärke', gentle: 'Schonend', balanced: 'Ausgewogen', strong: 'Stark', gentleHint: 'Schonend · hohe Qualität', strongHint: 'Stark · weniger Qualität',
-    qualityHigh: 'Qualität: hoch', qualityUnchanged: 'Qualität: unverändert', qualityReduced: 'Qualität: reduziert', qualityMuchLower: 'Qualität: deutlich geringer', detailsReduced: 'Details: ggf. reduziert', detailsMuchLower: 'Details: ggf. deutlich reduziert', resolutionUnchanged: 'Auflösung: unverändert',
+    qualityMuchLower: 'Qualität: deutlich geringer',
     outputFormat: 'Ausgabeformat', pngLossless: 'PNG (verlustfrei)', targetSize: 'Zielgröße (MB, optional)', targetPlaceholder: 'z. B. 2,5',
     process: 'Lokal verarbeiten', processing: 'Verarbeitung läuft …', download: 'Ergebnis herunterladen', downloadStarted: 'Download gestartet ✓', downloadAgain: 'Erneut herunterladen', downloadStatus: 'Download gestartet. Prüfe deinen Downloads-Ordner.',
     original: 'Original', result: 'Ergebnis', originalPreview: 'Vorschau der Originaldatei', resultPreview: 'Vorschau des Ergebnisses', footer: 'Deine Dateien bleiben auf deinem Gerät.', opening: 'Konverter wird geöffnet …', openingFailed: 'Fenster konnte nicht geöffnet werden. Bitte Erweiterung neu laden.',
@@ -114,7 +112,6 @@ export const messages = {
   es: {
     officePdfNotice: 'PDF local con texto como páginas de imagen. Pueden perderse diseño, imágenes, fórmulas y gráficos; el texto no se puede buscar.',
     mediaNotice: 'Conversión local; los códecs dependen del navegador.',
-    mediaQualityNotice: 'Más compresión reduce la tasa de bits y quizá la resolución.',
     mediaWarning: 'Los ajustes fuertes pueden reducir notablemente sonido e imagen.',
     mediaCodecUnavailable: 'Este navegador no puede codificar este formato localmente.',
     mediaReadError: 'Este navegador no puede leer o convertir este archivo multimedia.',
@@ -144,7 +141,7 @@ export const messages = {
     appName: 'Conversor local', eyebrow: 'PRIVADO · SIN CONEXIÓN', intro: 'Convierte y optimiza archivos localmente.', languageButton: 'Idioma: {language}', autoLanguage: 'Automático', languageSaveError: 'No se pudo guardar el idioma elegido en este navegador.', themeButton: 'Tema de color: {theme}', autoTheme: 'Automático', lightTheme: 'Claro', darkTheme: 'Oscuro', themeSaveError: 'No se pudo guardar el tema en este navegador.',
     chooseFile: 'Seleccionar archivo', dropFile: 'Suelta un archivo aquí', orChoose: 'o haz clic para seleccionar', supportedFormats: 'Imágenes, PDF, audio, vídeo y Office', removeFile: 'Quitar archivo',
     compressionStrength: 'Intensidad de compresión', gentle: 'Suave', balanced: 'Equilibrada', strong: 'Alta', gentleHint: 'Suave · alta calidad', strongHint: 'Alta · menor calidad',
-    qualityHigh: 'Calidad: alta', qualityUnchanged: 'Calidad: sin cambios', qualityReduced: 'Calidad: reducida', qualityMuchLower: 'Calidad: mucho menor', detailsReduced: 'Detalles: pueden reducirse', detailsMuchLower: 'Detalles: pueden reducirse mucho', resolutionUnchanged: 'Resolución: sin cambios',
+    qualityMuchLower: 'Calidad: mucho menor',
     outputFormat: 'Formato de salida', pngLossless: 'PNG (sin pérdida)', targetSize: 'Tamaño objetivo (MB, opcional)', targetPlaceholder: 'p. ej., 2,5',
     process: 'Procesar localmente', processing: 'Procesando…', download: 'Descargar resultado', downloadStarted: 'Descarga iniciada ✓', downloadAgain: 'Descargar de nuevo', downloadStatus: 'Descarga iniciada. Revisa tu carpeta de descargas.',
     original: 'Original', result: 'Resultado', originalPreview: 'Vista previa del archivo original', resultPreview: 'Vista previa del resultado', footer: 'Tus archivos permanecen en tu dispositivo.', opening: 'Abriendo conversor…', openingFailed: 'No se pudo abrir la ventana. Vuelve a cargar la extensión.',
@@ -170,7 +167,6 @@ export const messages = {
   fr: {
     officePdfNotice: 'PDF local avec texte en pages image. Mise en page, images, formules et graphiques peuvent être perdus ; texte non consultable.',
     mediaNotice: 'Conversion locale ; les codecs dépendent du navigateur.',
-    mediaQualityNotice: 'Plus de compression réduit le débit et parfois la résolution.',
     mediaWarning: 'Des réglages forts peuvent dégrader nettement son et image.',
     mediaCodecUnavailable: 'Ce navigateur ne peut pas encoder ce format localement.',
     mediaReadError: 'Ce navigateur ne peut pas lire ou convertir ce média localement.',
@@ -200,7 +196,7 @@ export const messages = {
     appName: 'Convertisseur local', eyebrow: 'PRIVÉ · HORS LIGNE', intro: 'Convertissez et optimisez vos fichiers localement.', languageButton: 'Langue : {language}', autoLanguage: 'Automatique', languageSaveError: 'Impossible d’enregistrer la langue choisie dans ce navigateur.', themeButton: 'Thème de couleurs : {theme}', autoTheme: 'Automatique', lightTheme: 'Clair', darkTheme: 'Sombre', themeSaveError: 'Impossible d’enregistrer le thème dans ce navigateur.',
     chooseFile: 'Choisir un fichier', dropFile: 'Déposez un fichier ici', orChoose: 'ou cliquez pour choisir', supportedFormats: 'Images, PDF, audio, vidéo et Office', removeFile: 'Supprimer le fichier',
     compressionStrength: 'Intensité de compression', gentle: 'Douce', balanced: 'Équilibrée', strong: 'Forte', gentleHint: 'Douce · qualité élevée', strongHint: 'Forte · qualité réduite',
-    qualityHigh: 'Qualité : élevée', qualityUnchanged: 'Qualité : inchangée', qualityReduced: 'Qualité : réduite', qualityMuchLower: 'Qualité : nettement réduite', detailsReduced: 'Détails : réduction possible', detailsMuchLower: 'Détails : forte réduction possible', resolutionUnchanged: 'Résolution : inchangée',
+    qualityMuchLower: 'Qualité : nettement réduite',
     outputFormat: 'Format de sortie', pngLossless: 'PNG (sans perte)', targetSize: 'Taille cible (Mo, facultatif)', targetPlaceholder: 'p. ex. 2,5',
     process: 'Traiter localement', processing: 'Traitement en cours…', download: 'Télécharger le résultat', downloadStarted: 'Téléchargement lancé ✓', downloadAgain: 'Télécharger à nouveau', downloadStatus: 'Téléchargement lancé. Vérifiez votre dossier Téléchargements.',
     original: 'Original', result: 'Résultat', originalPreview: 'Aperçu du fichier original', resultPreview: 'Aperçu du résultat', footer: 'Vos fichiers restent sur votre appareil.', opening: 'Ouverture du convertisseur…', openingFailed: 'Impossible d’ouvrir la fenêtre. Rechargez l’extension.',
@@ -227,6 +223,8 @@ export const messages = {
 
 Object.assign(messages.en, {
   dropFilesHere: 'Drop files anywhere here',
+  adjustedResult: 'Adjusted: {original} → {result}.{target}',
+  outputWidth: 'Width (px)', outputHeight: 'Height (px)', dimensionsHelp: 'One value keeps proportions; two values add padding if needed.', squareMode: 'Square', squareNone: 'No', squarePad: 'Fit without cropping', backgroundColor: 'Background color', backgroundFill: 'Fill', invalidOutputDimensions: 'Use 1–10000 px per side and at most 20 megapixels.', conflictingDimensions: 'Use either longest edge or width and height.', invalidSquareDimensions: 'For square output, width and height must match.',
   pdfAdjust: 'Adjust PDF', targetSizeSummary: 'Target {size} MB', renamedSummary: 'Renamed', outputName: 'File name (optional, without extension)', outputNamePlaceholder: 'Keep suggested name', invalidOutputName: 'Enter a valid file name without slashes or special characters.',
   imageAdjust: 'Adjust image', maxDimension: 'Longest edge (px)', autoSize: 'Auto', rotate: 'Rotate', noRotation: 'No rotation', squareCrop: 'Center crop to square',
   invalidCrop: 'Invalid image dimensions or crop.', invalidDimension: 'Enter a longest edge between 1 and 10000 px.',
@@ -237,6 +235,8 @@ Object.assign(messages.en, {
 });
 Object.assign(messages.de, {
   dropFilesHere: 'Dateien hier ablegen',
+  adjustedResult: 'Angepasst: {original} → {result}.{target}',
+  outputWidth: 'Breite (px)', outputHeight: 'Höhe (px)', dimensionsHelp: 'Ein Wert erhält das Seitenverhältnis; zwei ergänzen bei Bedarf Randfläche.', squareMode: 'Quadratisch', squareNone: 'Nein', squarePad: 'Einpassen ohne Beschnitt', backgroundColor: 'Hintergrundfarbe', backgroundFill: 'Füllen', invalidOutputDimensions: 'Bitte 1–10000 px pro Seite und höchstens 20 Megapixel wählen.', conflictingDimensions: 'Entweder längste Kante oder Breite und Höhe verwenden.', invalidSquareDimensions: 'Für quadratische Ausgabe müssen Breite und Höhe gleich sein.',
   pdfAdjust: 'PDF anpassen', targetSizeSummary: 'Ziel {size} MB', renamedSummary: 'Umbenannt', outputName: 'Dateiname (optional, ohne Endung)', outputNamePlaceholder: 'Vorgeschlagenen Namen behalten', invalidOutputName: 'Bitte einen gültigen Dateinamen ohne Schrägstriche oder Sonderzeichen eingeben.',
   imageAdjust: 'Bild anpassen', maxDimension: 'Längste Kante (px)', autoSize: 'Automatisch', rotate: 'Drehen', noRotation: 'Nicht drehen', squareCrop: 'Mittig quadratisch zuschneiden',
   invalidCrop: 'Ungültige Bildmaße oder ungültiger Zuschnitt.', invalidDimension: 'Bitte eine längste Kante zwischen 1 und 10000 px eingeben.',
@@ -247,6 +247,8 @@ Object.assign(messages.de, {
 });
 Object.assign(messages.es, {
   dropFilesHere: 'Suelta los archivos aquí',
+  adjustedResult: 'Ajustado: {original} → {result}.{target}',
+  outputWidth: 'Ancho (px)', outputHeight: 'Alto (px)', dimensionsHelp: 'Un valor conserva la proporción; dos añaden márgenes si hace falta.', squareMode: 'Cuadrado', squareNone: 'No', squarePad: 'Ajustar sin recortar', backgroundColor: 'Color de fondo', backgroundFill: 'Rellenar', invalidOutputDimensions: 'Usa 1–10000 px por lado y un máximo de 20 megapíxeles.', conflictingDimensions: 'Usa el lado mayor o el ancho y el alto.', invalidSquareDimensions: 'Para un resultado cuadrado, ancho y alto deben coincidir.',
   pdfAdjust: 'Ajustar PDF', targetSizeSummary: 'Objetivo {size} MB', renamedSummary: 'Renombrado', outputName: 'Nombre de archivo (opcional, sin extensión)', outputNamePlaceholder: 'Mantener el nombre sugerido', invalidOutputName: 'Introduce un nombre válido sin barras ni caracteres especiales.',
   imageAdjust: 'Ajustar imagen', maxDimension: 'Lado mayor (px)', autoSize: 'Automático', rotate: 'Girar', noRotation: 'Sin giro', squareCrop: 'Recortar al centro en cuadrado',
   invalidCrop: 'Dimensiones o recorte no válidos.', invalidDimension: 'Introduce un lado mayor entre 1 y 10000 px.',
@@ -257,6 +259,8 @@ Object.assign(messages.es, {
 });
 Object.assign(messages.fr, {
   dropFilesHere: 'Déposez les fichiers ici',
+  adjustedResult: 'Ajusté : {original} → {result}.{target}',
+  outputWidth: 'Largeur (px)', outputHeight: 'Hauteur (px)', dimensionsHelp: 'Une valeur conserve les proportions ; deux ajoutent des marges si besoin.', squareMode: 'Carré', squareNone: 'Non', squarePad: 'Ajuster sans rogner', backgroundColor: 'Couleur de fond', backgroundFill: 'Remplir', invalidOutputDimensions: 'Utilisez 1–10000 px par côté et 20 mégapixels au maximum.', conflictingDimensions: 'Utilisez le côté long ou la largeur et la hauteur.', invalidSquareDimensions: 'Pour un résultat carré, largeur et hauteur doivent être égales.',
   pdfAdjust: 'Ajuster le PDF', targetSizeSummary: 'Cible {size} Mo', renamedSummary: 'Renommé', outputName: 'Nom du fichier (facultatif, sans extension)', outputNamePlaceholder: 'Garder le nom suggéré', invalidOutputName: 'Saisissez un nom valide sans barre oblique ni caractère spécial.',
   imageAdjust: 'Ajuster l’image', maxDimension: 'Côté le plus long (px)', autoSize: 'Automatique', rotate: 'Rotation', noRotation: 'Aucune rotation', squareCrop: 'Recadrer au centre en carré',
   invalidCrop: 'Dimensions ou recadrage invalides.', invalidDimension: 'Saisissez un côté entre 1 et 10000 px.',

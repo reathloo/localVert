@@ -93,7 +93,23 @@ function imageOptions() {
   const raw = $('max-dimension').value.trim();
   const maxDimension = raw ? Number(raw) : null;
   if (raw && (!Number.isInteger(maxDimension) || maxDimension < 1 || maxDimension > 10000)) throw new Error(t('invalidDimension'));
-  return { maxDimension, rotation: Number($('rotation').value), squareCrop: $('square-crop').checked };
+  const dimension = (id) => {
+    const text = $(id).value.trim();
+    const value = text ? Number(text) : null;
+    if (text && (!Number.isInteger(value) || value < 1 || value > 10000)) throw new Error(t('invalidOutputDimensions'));
+    return value;
+  };
+  const width = dimension('output-width');
+  const height = dimension('output-height');
+  if (width && height && width * height > 20_000_000) throw new Error(t('invalidOutputDimensions'));
+  if (maxDimension && (width || height)) throw new Error(t('conflictingDimensions'));
+  const squareMode = $('square-mode').value;
+  if (squareMode !== 'none' && width && height && width !== height) throw new Error(t('invalidSquareDimensions'));
+  return { maxDimension, width, height, rotation: Number($('rotation').value), squareCrop: squareMode === 'crop', squarePad: squareMode === 'pad', backgroundColor: $('background-fill').checked ? $('background-color').value : null };
+}
+
+function hasImageAdjustments(options) {
+  return !!(options.maxDimension || options.width || options.height || options.rotation || options.squareCrop || options.squarePad || options.backgroundColor);
 }
 
 function targetBytesFor(source, outputType) {
@@ -136,7 +152,8 @@ function stopEstimate() {
 }
 
 function setBusy(busy) {
-  for (const control of [quality, format, target, outputName, $('max-dimension'), $('rotation'), $('square-crop'), $('process')]) control.disabled = busy;
+  for (const control of [quality, format, target, outputName, $('max-dimension'), $('output-width'), $('output-height'), $('rotation'), $('square-mode'), $('background-fill'), $('process')]) control.disabled = busy;
+  $('background-color').disabled = busy || !$('background-fill').checked;
   $('cancel').hidden = !busy;
   $('progress').hidden = !busy;
   $('estimate').hidden = busy || !file || !!result;
@@ -208,12 +225,8 @@ function renderSettings() {
   $('quality-output').textContent = t(strength <= 30 ? 'gentle' : strength <= 65 ? 'balanced' : 'strong');
   quality.setAttribute('aria-valuetext', $('quality-output').textContent);
   const unchangedPng = outputType === 'image/png' && imageCache && imageCache.sourceWidth === imageCache.width && imageCache.sourceHeight === imageCache.height && !target.value;
-  const alreadyFits = isImageOutput && outputType === file.type && !$('max-dimension').value && !$('square-crop').checked && $('rotation').value === '0'
+  const alreadyFits = isImageOutput && outputType === file.type && !$('max-dimension').value && !$('output-width').value && !$('output-height').value && $('square-mode').value === 'none' && !$('background-fill').checked && $('rotation').value === '0'
     && Number(target.value.replace(',', '.')) * 1024 ** 2 >= file.size;
-  $('quality-status').className = `quality-status quality-${unchangedPng || alreadyFits ? 'good' : level}`;
-  $('quality-status').textContent = t(alreadyFits ? 'qualityUnchanged' : isAudio || isVideo ? 'mediaQualityNotice' : unchangedPng ? 'resolutionUnchanged' : isPdf && strength <= 30 ? 'qualityUnchanged'
-    : outputType === 'image/png' ? (strength > 65 ? 'detailsMuchLower' : strength > 30 ? 'detailsReduced' : 'qualityHigh')
-      : strength > 65 ? 'qualityMuchLower' : strength > 30 ? 'qualityReduced' : 'qualityHigh');
   $('quality-warning').hidden = strength <= 65 || unchangedPng || alreadyFits;
   $('quality-warning').textContent = t(isAudio || isVideo ? 'mediaWarning' : isPdf ? 'pdfWarning' : outputType === 'image/png' ? 'pngWarning' : 'imageWarning');
 }
@@ -231,7 +244,7 @@ function renderEstimate() {
   const { size = file.size, pages, image } = estimateData;
   const percent = Math.round((size / file.size - 1) * 100);
   const sameFormat = file.type === format.value;
-  const note = sameFormat && size >= file.size ? t('estimateKeepOriginal')
+  const note = sameFormat && size >= file.size && !estimateData.transformed ? t('estimateKeepOriginal')
     : pages > 1 ? t('estimateFirstPage')
       : image && (image.width !== image.sourceWidth || image.height !== image.sourceHeight)
         ? t('estimateResolution', { width: image.width, height: image.height }) : '';
@@ -263,7 +276,8 @@ function renderResult() {
     ? t('convertedResult', { result: formatBytes(blob.size), original: formatBytes(source.size), target: targetNote })
     : saved > 0
       ? t('savedResult', { result: formatBytes(blob.size), original: formatBytes(source.size), percent: Math.round(saved / source.size * 100), target: targetNote })
-      : t('noSmallerResult', { onePixel: image?.sourceWidth === 1 && image?.sourceHeight === 1 ? t('onePixelResult') : '', target: targetNote });
+      : !keepOriginal ? t('adjustedResult', { result: formatBytes(blob.size), original: formatBytes(source.size), target: targetNote })
+        : t('noSmallerResult', { onePixel: image?.sourceWidth === 1 && image?.sourceHeight === 1 ? t('onePixelResult') : '', target: targetNote });
   if (isPdf && !keepOriginal && result.blob.type === 'application/pdf') $('result-stats').textContent += t('pdfResultWarning');
   if (isPdf && result.blob.type === 'text/plain') $('result-stats').textContent += t('pdfTextResult');
   if (source.type.includes('officedocument')) $('result-stats').textContent += t('officeResultWarning');
@@ -308,13 +322,14 @@ function scheduleEstimate() {
   estimation = controller;
   estimateTimer = setTimeout(async () => {
     try {
+      const options = isImage ? imageOptions() : {};
       const data = config.isPdf ? await estimatePdf(source, config.value, controller.signal)
-        : await compressImage(source, config.outputType, config.value, controller.signal, imageOptions());
+        : await compressImage(source, config.outputType, config.value, controller.signal, options);
       if (controller.signal.aborted) return;
       if (config.isPdf) estimateData = data;
       else {
         imageCache = data;
-        estimateData = { size: data.blob.size, image: data };
+        estimateData = { size: data.blob.size, image: data, transformed: hasImageAdjustments(options) };
       }
     } catch (error) {
       if (controller.signal.aborted) return;
@@ -350,8 +365,13 @@ async function selectFiles(candidates) {
   if (!accepted.length) return;
   if (!items.length) {
     $('max-dimension').value = '';
+    $('output-width').value = '';
+    $('output-height').value = '';
     $('rotation').value = '0';
-    $('square-crop').checked = false;
+    $('square-mode').value = 'none';
+    $('background-fill').checked = false;
+    $('background-color').value = '#ffffff';
+    $('background-color').disabled = true;
     target.value = '';
     outputName.value = '';
     $('adjust-options').open = false;
@@ -630,7 +650,13 @@ format.addEventListener('change', () => {
   if (!supportsTarget) target.value = '';
   changed();
 });
-for (const id of ['max-dimension', 'rotation', 'square-crop']) $(id).addEventListener('change', changed);
+for (const id of ['max-dimension', 'output-width', 'output-height']) $(id).addEventListener('input', () => {
+  if (id === 'max-dimension' && $(id).value) { $('output-width').value = ''; $('output-height').value = ''; }
+  else if ($(id).value) $('max-dimension').value = '';
+  changed();
+});
+for (const id of ['rotation', 'square-mode', 'background-color']) $(id).addEventListener('change', changed);
+$('background-fill').addEventListener('change', () => { $('background-color').disabled = !$('background-fill').checked; changed(); });
 target.addEventListener('input', () => { clearResult(); if (items.length === 1) items[0].result = null; $('error').hidden = true; scheduleEstimate(); });
 outputName.addEventListener('input', () => {
   $('error').hidden = true;
@@ -644,7 +670,7 @@ $('cancel').addEventListener('click', changed);
 
 async function convert(source, outputType, strength, targetBytes, cached, signal, updateProgress, options = {}) {
   const value = 100 - strength;
-  const transformed = !!(options.maxDimension || options.rotation || options.squareCrop);
+  const transformed = hasImageAdjustments(options);
   const image = source.type.startsWith('image/') && outputType.startsWith('image/')
     ? cached ?? (targetBytes && source.type === outputType && source.size <= targetBytes && !transformed ? { blob: source, targetMet: true }
       : targetBytes ? await compressImageToTarget(source, outputType, targetBytes, signal, options) : await compressImage(source, outputType, value, signal, options)) : null;

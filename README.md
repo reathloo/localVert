@@ -9,7 +9,7 @@ Das Farbschema folgt zunächst automatisch dem hellen oder dunklen Browser-/Syst
 ## Funktionen
 
 - JPG, PNG und WebP komprimieren und ineinander konvertieren; GIF (erstes Bild), TIFF (erste Seite), AVIF und HEIC als Eingaben. AVIF-Ausgabe und HEIC-Eingabe hängen vom Browser ab.
-- Bei Bildern längste Kante, Drehung und mittigen quadratischen Zuschnitt einstellen. Neu kodierte Bilder enthalten keine ursprünglichen EXIF-Standortdaten; das Original bleibt unangetastet.
+- Bei Bildern längste Kante, feste Breite/Höhe, Drehung, quadratischen Zuschnitt oder quadratisches Einpassen ohne Beschnitt einstellen. Transparente Ränder lassen sich optional mit einer gewählten Hintergrundfarbe füllen; JPEG nutzt ohne Auswahl Weiß. Ein einzelner Pixelwert erhält das Seitenverhältnis, zwei Werte passen das Bild ohne Verzerrung in die exakte Fläche ein. Neu kodierte Bilder enthalten keine ursprünglichen EXIF-Standortdaten; das Original bleibt unangetastet.
 - Im aufklappbaren Bereich „Bild/PDF anpassen“ optional eine Zielgröße setzen und den Ausgabedateinamen ändern. Die passende Dateiendung wird ergänzt; die Originaldatei wird nicht umbenannt.
 - Ein oder mehrere Bilder als PDF ausgeben; Transparenz wird weiß hinterlegt. PDF-Seiten als JPG/PNG in einem ZIP exportieren.
 - PDF im schonenden Modus strukturerhaltend neu speichern, wenn dabei Platz gespart wird. PDFs mit erkennbaren Formularen/Signaturen sowie nicht kleinere Ergebnisse bleiben unverändert. Alternativ bildbasierte PDF neu erzeugen; auswählbaren PDF-Text als TXT exportieren.

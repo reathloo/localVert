@@ -88,8 +88,12 @@ select, input[type="text"], input[type="number"] { width: 100%; min-width: 0; pa
 .image-options-grid { display: grid; grid-template-columns: 1fr 1fr; column-gap: 12px; }
 .image-options-grid .control-group { margin: 14px 0 5px; }
 .image-options-grid .control-group label { display: block; margin-bottom: 7px; font-size: 11px; font-weight: 600; }
-.check-row { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; margin-top: 9px; color: var(--muted); font-size: 11px; cursor: pointer; }
-.check-row input { accent-color: var(--accent); }
+.image-options-help { grid-column: 1 / -1; margin: 2px 0 0; }
+.background-control { display: flex; align-items: center; min-height: 34px; gap: 10px; }
+.image-options-grid .background-toggle { display: flex; align-items: center; gap: 6px; margin: 0; color: var(--muted); font-weight: 500; cursor: pointer; }
+.background-toggle input { accent-color: var(--accent); }
+#background-color { width: 36px; height: 30px; padding: 2px; border: 1px solid var(--border); border-radius: 5px; background: var(--surface); cursor: pointer; }
+#background-color:disabled { opacity: .4; cursor: default; }
 .upload-field, .batch-zip { width: 100%; margin-top: 9px; }
 #workspace[data-quality="good"], #batch-workspace[data-quality="good"] { --quality-color: var(--good); }
 #workspace[data-quality="medium"], #batch-workspace[data-quality="medium"] { --quality-color: var(--warning); }
@@ -99,10 +103,6 @@ input[type="range"]::-webkit-slider-thumb { width: 18px; height: 18px; appearanc
 input[type="range"]::-moz-range-thumb { width: 14px; height: 14px; border: 2px solid var(--surface); border-radius: 50%; background: var(--quality-color); box-shadow: 0 0 0 1px var(--border); }
 .range-hints { display: flex; justify-content: space-between; gap: 16px; color: var(--muted); font-size: 10px; line-height: 1.4; }
 .range-hints span:last-child { text-align: right; }
-.quality-status { margin-top: 9px; font-size: 11px; line-height: 1.5; }
-.quality-good { color: var(--good); }
-.quality-medium { color: var(--warning); }
-.quality-low { color: var(--danger); }
 .field-help { display: block; margin-top: 7px; color: var(--muted); font-size: 11px; line-height: 1.5; }
 .notice, .warning, .error { margin: 12px 0; padding: 10px 12px; border-left: 2px solid; border-radius: 0 4px 4px 0; font-size: 12px; line-height: 1.5; }
 .notice { color: var(--muted); background: var(--hover); border-color: var(--border); }

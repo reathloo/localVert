@@ -117,6 +117,41 @@ async function run(files) {
     assert(bitmap.width === bitmap.height && bitmap.width <= 800 && bitmap.width > 0, 'Image options did not apply');
     bitmap.close();
   });
+  await check('Fixed pixels preserve proportions and add transparent padding', async () => {
+    const sourceCanvas = document.createElement('canvas');
+    sourceCanvas.width = 4; sourceCanvas.height = 2;
+    sourceCanvas.getContext('2d').fillRect(0, 0, 4, 2);
+    const source = new File([await new Promise((resolve) => sourceCanvas.toBlob(resolve, 'image/png'))], 'wide.png', { type: 'image/png' });
+    const proportional = await compressImage(source, 'image/png', 80, signal(), { width: 40 });
+    assert(proportional.width === 40 && proportional.height === 20, `One pixel value changed proportions: ${proportional.width} × ${proportional.height}`);
+    const fixed = await compressImage(source, 'image/png', 80, signal(), { width: 40, height: 40 });
+    assert(fixed.width === 40 && fixed.height === 40, 'Fixed output size not applied');
+    const bitmap = await createImageBitmap(fixed.blob);
+    const inspect = document.createElement('canvas');
+    inspect.width = inspect.height = 40;
+    const context = inspect.getContext('2d');
+    context.drawImage(bitmap, 0, 0);
+    assert(context.getImageData(20, 0, 1, 1).data[3] === 0 && context.getImageData(20, 20, 1, 1).data[3] === 255, 'Padding cropped or stretched the image');
+    bitmap.close();
+  });
+  await check('Square padding and chosen background color preserve the image', async () => {
+    const sourceCanvas = document.createElement('canvas');
+    sourceCanvas.width = 4; sourceCanvas.height = 2;
+    sourceCanvas.getContext('2d').fillRect(0, 0, 4, 2);
+    const source = new File([await new Promise((resolve) => sourceCanvas.toBlob(resolve, 'image/png'))], 'wide.png', { type: 'image/png' });
+    const padded = await compressImage(source, 'image/png', 80, signal(), { squarePad: true, backgroundColor: '#ffffff' });
+    assert(padded.width === 4 && padded.height === 4, `Square padding produced wrong dimensions: ${padded.width} × ${padded.height}`);
+    const bitmap = await createImageBitmap(padded.blob);
+    const inspect = document.createElement('canvas');
+    inspect.width = inspect.height = 4;
+    const context = inspect.getContext('2d');
+    context.drawImage(bitmap, 0, 0);
+    const border = context.getImageData(1, 0, 1, 1).data;
+    const middle = context.getImageData(1, 2, 1, 1).data;
+    assert(border[0] === 255 && border[1] === 255 && border[2] === 255 && border[3] === 255, 'Background fill was not applied');
+    assert(middle[0] === 0 && middle[1] === 0 && middle[2] === 0 && middle[3] === 255, 'Image content was lost');
+    bitmap.close();
+  });
   await check('Target size reports success or failure honestly', async () => {
     const candidate = await compressImageToTarget(png, 'image/jpeg', 1, signal());
     assert(candidate.targetMet === (candidate.blob.size <= 1), 'Target state is incorrect');

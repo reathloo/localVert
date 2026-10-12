@@ -80,7 +80,6 @@ export async function compressImage(file, outputType, value, signal, options = {
     signal.throwIfAborted();
     const sourceWidth = bitmap.width;
     const sourceHeight = bitmap.height;
-    const maxDimension = Math.min(options.maxDimension || Infinity, value < 35 ? 1800 : value < 70 ? 2400 : 3200);
     const strength = 100 - value;
     const pngScale = outputType === 'image/png' && strength > 30 ? 1 - .5 * (strength - 30) / 60 : 1;
     const side = Math.min(sourceWidth, sourceHeight);
@@ -92,20 +91,31 @@ export async function compressImage(file, outputType, value, signal, options = {
     const rotated = rotation === 90 || rotation === 270;
     const baseWidth = rotated ? crop.height : crop.width;
     const baseHeight = rotated ? crop.width : crop.height;
-    const scale = Math.min(1, maxDimension / Math.max(baseWidth, baseHeight), Math.sqrt(20_000_000 / (baseWidth * baseHeight))) * pngScale;
-    canvas.width = Math.max(1, Math.round(baseWidth * scale));
-    canvas.height = Math.max(1, Math.round(baseHeight * scale));
+    const logicalWidth = options.squarePad ? Math.max(baseWidth, baseHeight) : baseWidth;
+    const logicalHeight = options.squarePad ? logicalWidth : baseHeight;
+    const fixedWidth = options.width || null;
+    const fixedHeight = options.height || null;
+    if (fixedWidth || fixedHeight) {
+      canvas.width = fixedWidth || Math.max(1, Math.round(fixedHeight * logicalWidth / logicalHeight));
+      canvas.height = fixedHeight || Math.max(1, Math.round(fixedWidth * logicalHeight / logicalWidth));
+      if (canvas.width > 10000 || canvas.height > 10000 || canvas.width * canvas.height > 20_000_000) throw new Error(t('invalidOutputDimensions'));
+    } else {
+      const maxDimension = Math.min(options.maxDimension || Infinity, value < 35 ? 1800 : value < 70 ? 2400 : 3200);
+      const scale = Math.min(1, maxDimension / Math.max(logicalWidth, logicalHeight), Math.sqrt(20_000_000 / (logicalWidth * logicalHeight))) * pngScale;
+      canvas.width = Math.max(1, Math.round(logicalWidth * scale));
+      canvas.height = Math.max(1, Math.round(logicalHeight * scale));
+    }
     const context = canvas.getContext('2d', { alpha: outputType !== 'image/jpeg' });
     if (!context) throw new Error(t('canvasMemory'));
-    if (outputType === 'image/jpeg') {
-      context.fillStyle = '#fff';
+    if (outputType === 'image/jpeg' || options.backgroundColor) {
+      context.fillStyle = options.backgroundColor || '#fff';
       context.fillRect(0, 0, canvas.width, canvas.height);
     }
+    const fit = Math.min(canvas.width / logicalWidth, canvas.height / logicalHeight);
     context.translate(canvas.width / 2, canvas.height / 2);
     context.rotate(rotation * Math.PI / 180);
     context.drawImage(bitmap, crop.x, crop.y, crop.width, crop.height,
-      -(rotated ? canvas.height : canvas.width) / 2, -(rotated ? canvas.width : canvas.height) / 2,
-      rotated ? canvas.height : canvas.width, rotated ? canvas.width : canvas.height);
+      -crop.width * fit / 2, -crop.height * fit / 2, crop.width * fit, crop.height * fit);
     const blob = await encodeCanvas(canvas, outputType, Math.max(.1, Math.min(1, value / 100)));
     signal.throwIfAborted();
     return { blob, sourceWidth, sourceHeight, width: canvas.width, height: canvas.height };
