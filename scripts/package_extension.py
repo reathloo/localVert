@@ -16,6 +16,8 @@ REQUIRED_BUNDLES = {
     "src/zip.js",
     "src/upload-field.js",
     "src/file-drop.js",
+    "src/pdf-pages.js",
+    "src/clipboard-image.js",
     "vendor/generated/media-vendor.js",
     "vendor/generated/tiff-vendor.js",
     "vendor/generated/media-vendor.js.LEGAL.txt",

@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "default_locale": "en",
   "name": "__MSG_extensionName__",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "__MSG_extensionDescription__",
   "icons": {
     "16": "assets/icons/icon-16.png",
@@ -21,6 +21,12 @@
     }
   },
   "permissions": ["activeTab", "scripting"],
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "localvert@reathloo.dev",
+      "data_collection_permissions": { "required": ["none"] }
+    }
+  },
   "content_security_policy": {
     "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'none'; connect-src 'self'; img-src 'self' blob: data:; style-src 'self';"
   }

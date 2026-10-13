@@ -1,4 +1,4 @@
 {
-  "extensionName": { "message": "Lokal Konverter" },
-  "extensionDescription": { "message": "Komprimiert Bilder und PDFs vollständig lokal im Browser." }
+  "extensionName": { "message": "localVert" },
+  "extensionDescription": { "message": "Dateien lokal konvertieren und verkleinern. Ohne Upload und Konto." }
 }

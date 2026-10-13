@@ -48,6 +48,7 @@
         <span class="drop-help" data-i18n="orChoose">or click to choose</span>
         <small class="drop-help" data-i18n="supportedFormats">Images, PDF, MP3, WAV, DOCX and XLSX</small>
       </section>
+      <button id="paste-image" class="quiet-action" type="button" data-i18n="pasteImage">Paste image</button>
       <div id="drop-overlay" class="drop-overlay" aria-hidden="true" hidden>
         <div><svg class="drop-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6M8 15h8m-4-4v8"/></svg><strong data-i18n="dropFilesHere">Drop files anywhere here</strong></div>
       </div>
@@ -116,6 +117,17 @@
           </div>
           <p id="preview-error" class="field-help" data-i18n="previewFailed" hidden></p>
         </section>
+        <details id="pdf-pages-tools" class="pdf-pages-tools" hidden>
+          <summary data-i18n="pdfPagesTitle">Edit PDF pages</summary>
+          <p class="field-help" data-i18n="pdfPagesHelp">Reorder, rotate or remove pages. The original stays unchanged.</p>
+          <p id="pdf-pages-status" class="field-help" role="status"></p>
+          <div id="pdf-pages-list" class="pdf-pages-list"></div>
+          <div class="pdf-pages-actions">
+            <button id="pdf-pages-save" class="secondary-button" type="button" data-i18n="pdfPagesSave">Download edited PDF</button>
+            <button id="pdf-pages-extract" class="secondary-button" type="button" data-i18n="pdfPagesExtract">Download selected pages</button>
+            <button id="pdf-pages-reset" class="quiet-action" type="button" data-i18n="pdfPagesReset">Reset pages</button>
+          </div>
+        </details>
         </div>
         <section id="batch-workspace" class="batch-workspace" aria-labelledby="batch-title" hidden>
           <div class="batch-heading"><h2 id="batch-title" data-i18n="batchTitle">Files</h2><span id="batch-count"></span></div>

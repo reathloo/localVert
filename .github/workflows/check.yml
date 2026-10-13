@@ -32,6 +32,13 @@ jobs:
         run: python -m unittest discover -s tests -p 'test_*.py'
       - name: Build store package
         run: python scripts/package_extension.py
+      - name: Lint packaged Firefox extension
+        run: |
+          archive=$(find dist -maxdepth 1 -name 'localvert-*.zip' -print -quit)
+          test -n "$archive"
+          mkdir -p dist/firefox-lint
+          python -m zipfile -e "$archive" dist/firefox-lint
+          pnpm exec web-ext lint --source-dir dist/firefox-lint
       - uses: actions/upload-artifact@v4
         with:
           name: extension-zip

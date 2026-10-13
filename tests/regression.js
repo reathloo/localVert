@@ -7,6 +7,8 @@ import { ALL_FORMATS, BlobSource, Input } from '../vendor/generated/media-vendor
 import { zipBlobs } from '../src/zip.js';
 import { fillUploadField } from '../src/upload-field.js';
 import { installFileDrop } from '../src/file-drop.js';
+import { imageFromPaste } from '../src/clipboard-image.js';
+import { editPdfPages, inspectPdfPages, mergePdfs } from '../src/pdf-pages.js';
 
 const output = document.querySelector('#results');
 const assert = (condition, message) => { if (!condition) throw new Error(message); };
@@ -80,6 +82,14 @@ async function run(files) {
       root.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: transfer }));
       assert(overlay.hidden && received.length === 1 && received[0].name === 'dropped.png', 'Dropped file was not accepted');
     } finally { dispose(); }
+  });
+  await check('Pasted image is turned into a local file', async () => {
+    const transfer = new DataTransfer();
+    transfer.items.add(new File([png], 'screenshot.png', { type: 'image/png' }));
+    const pasted = imageFromPaste(transfer);
+    assert(pasted.name === 'clipboard-image.png' && pasted.type === 'image/png', 'Clipboard image missing');
+    assert(await hash(pasted) === await hash(png), 'Clipboard image bytes changed');
+    assert(imageFromPaste(new DataTransfer()) === null, 'Empty clipboard accepted');
   });
   for (const name of ['invalid.jpg', 'empty.png']) {
     await check(`Reject ${name}`, async () => {
@@ -180,6 +190,46 @@ async function run(files) {
     const form = new File([await document.save()], 'form.pdf', { type: 'application/pdf' });
     const converted = await compressPdf(form, 80, null, signal(), () => {});
     assert(await hash(converted.blob) === await hash(form), 'Form PDF was modified');
+  });
+  await check('PDF page editor reorders, rotates and extracts locally', async () => {
+    const document = await PDFLib.PDFDocument.create();
+    document.addPage([200, 300]).drawText('first');
+    document.addPage([300, 200]).drawText('second');
+    const source = new File([await document.save()], 'pages.pdf', { type: 'application/pdf' });
+    const before = await hash(source);
+    const pages = await inspectPdfPages(source, signal());
+    assert(pages.length === 2 && pages[0].sourceIndex === 0, 'Page inspection failed');
+    const edited = await editPdfPages(source, [{ sourceIndex: 1, rotation: 90 }, { sourceIndex: 0, rotation: 0 }], signal());
+    const loaded = await PDFLib.PDFDocument.load(await edited.arrayBuffer());
+    assert(loaded.getPageCount() === 2 && loaded.getPage(0).getRotation().angle === 90, 'Order or rotation was lost');
+    assert((await (await pdfToText(edited, signal())).text()).includes('second'), 'Selectable text was lost');
+    const extracted = await editPdfPages(source, [{ sourceIndex: 1, rotation: 0 }], signal());
+    assert((await PDFLib.PDFDocument.load(await extracted.arrayBuffer())).getPageCount() === 1, 'Extraction failed');
+    assert(await hash(source) === before, 'Original PDF changed');
+    let rejected = false;
+    try { await editPdfPages(source, [{ sourceIndex: 2, rotation: 0 }], signal()); } catch { rejected = true; }
+    assert(rejected, 'Invalid page index accepted');
+  });
+  await check('PDF merge preserves pages and originals', async () => {
+    const before = await hash(pdf);
+    const merged = await mergePdfs([pdf, pdf], signal());
+    assert((await PDFLib.PDFDocument.load(await merged.arrayBuffer())).getPageCount() === 2, 'Merge page count wrong');
+    assert(await hash(pdf) === before, 'Source PDF changed');
+  });
+  await check('PDF page tools block interactive forms', async () => {
+    const document = await PDFLib.PDFDocument.create();
+    const page = document.addPage([300, 200]);
+    document.getForm().createTextField('name').addToPage(page, { x: 20, y: 100, width: 180, height: 30 });
+    const form = new File([await document.save()], 'form.pdf', { type: 'application/pdf' });
+    let rejected = false;
+    try { await inspectPdfPages(form, signal()); } catch { rejected = true; }
+    assert(rejected, 'Interactive PDF accepted for editing');
+  });
+  await check('PDF page tools block signed documents', async () => {
+    const signed = new File([pdf, '\n/ByteRange [0 1 2 3]\n'], 'signed.pdf', { type: 'application/pdf' });
+    let rejected = false;
+    try { await mergePdfs([signed, pdf], signal()); } catch { rejected = true; }
+    assert(rejected, 'Signed PDF accepted for merging');
   });
   await check('PDF estimate and compression create valid output', async () => {
     const source = files['scan.pdf'];
