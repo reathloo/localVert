@@ -22,6 +22,10 @@ class PackageTests(unittest.TestCase):
             with ZipFile(first) as archive:
                 names = set(archive.namelist())
                 self.assertEqual(archive.testzip(), None)
+                self.assertIn("LICENSE", names)
+                self.assertIn("THIRD_PARTY_NOTICES.md", names)
+                self.assertIn("vendor/generated/PAKO-LICENSE", names)
+                self.assertIn("vendor/generated/PAKO-ZLIB-NOTICE", names)
                 self.assertIn("manifest.json", names)
                 self.assertIn("src/main.js", names)
                 self.assertIn("assets/icons/icon-128.png", names)
@@ -36,11 +40,13 @@ class PackageTests(unittest.TestCase):
                 self.assertIn("src/clipboard-image.js", names)
                 self.assertFalse(any(name.startswith(("tests/", "assets/icon-concepts/", "dist/")) for name in names))
                 self.assertEqual(archive.read("manifest.json"), (ROOT / "manifest.json").read_bytes())
+                self.assertEqual(archive.read("LICENSE"), (ROOT / "LICENSE").read_bytes())
+                self.assertEqual(archive.read("THIRD_PARTY_NOTICES.md"), (ROOT / "THIRD_PARTY_NOTICES.md").read_bytes())
                 manifest = json.loads(archive.read("manifest.json"))
                 self.assertEqual(manifest["browser_specific_settings"]["gecko"]["data_collection_permissions"]["required"], ["none"])
                 self.assertEqual(manifest["browser_specific_settings"]["gecko"]["id"], "localvert@reathloo.dev")
                 self.assertEqual(manifest["permissions"], ["activeTab", "scripting"])
-                self.assertEqual(manifest["version"], "0.2.0")
+                self.assertEqual(manifest["version"], "0.2.1")
 
 
 if __name__ == "__main__":

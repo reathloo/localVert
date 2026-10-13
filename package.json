@@ -1,5 +1,6 @@
 {
   "private": true,
+  "license": "GPL-3.0-only",
   "scripts": {
     "build:vendor": "node scripts/build-vendor.mjs"
   },

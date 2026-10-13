@@ -9,7 +9,7 @@ from zipfile import ZIP_DEFLATED, ZipFile, ZipInfo
 
 
 ROOT = Path(__file__).resolve().parents[1]
-ROOT_FILES = {"manifest.json", "index.html", "launcher.html", "styles.css"}
+ROOT_FILES = {"LICENSE", "THIRD_PARTY_NOTICES.md", "manifest.json", "index.html", "launcher.html", "styles.css"}
 DIRECTORIES = ("_locales/", "src/", "vendor/", "assets/icons/")
 REQUIRED_BUNDLES = {
     "src/media-conversion.js",
@@ -24,6 +24,8 @@ REQUIRED_BUNDLES = {
     "vendor/generated/MEDIABUNNY-LICENSE",
     "vendor/generated/MP3-ENCODER-LICENSE",
     "vendor/generated/UTIF-LICENSE",
+    "vendor/generated/PAKO-LICENSE",
+    "vendor/generated/PAKO-ZLIB-NOTICE",
 }
 TIMESTAMP = (1980, 1, 1, 0, 0, 0)
 

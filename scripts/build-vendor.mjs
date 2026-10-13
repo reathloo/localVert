@@ -1,5 +1,7 @@
 import { build } from 'esbuild';
 import { copyFile } from 'node:fs/promises';
+import { createRequire } from 'node:module';
+import { dirname, join } from 'node:path';
 
 await build({
   entryPoints: ['scripts/media-vendor.js', 'scripts/tiff-vendor.js'],
@@ -12,8 +14,14 @@ await build({
   legalComments: 'external',
 });
 
+const utifRequire = createRequire(import.meta.resolve('utif'));
+const pakoRoot = dirname(utifRequire.resolve('pako/package.json'));
+
 await Promise.all([
   ['mediabunny', 'MEDIABUNNY-LICENSE'],
   ['@mediabunny/mp3-encoder', 'MP3-ENCODER-LICENSE'],
   ['utif', 'UTIF-LICENSE'],
-].map(([name, filename]) => copyFile(`node_modules/${name}/LICENSE`, `vendor/generated/${filename}`)));
+].map(([name, filename]) => copyFile(`node_modules/${name}/LICENSE`, `vendor/generated/${filename}`)).concat([
+  copyFile(join(pakoRoot, 'LICENSE'), 'vendor/generated/PAKO-LICENSE'),
+  copyFile(join(pakoRoot, 'lib/zlib/README'), 'vendor/generated/PAKO-ZLIB-NOTICE'),
+]));
