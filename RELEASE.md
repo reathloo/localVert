@@ -8,7 +8,7 @@ The source stays offline-first. A Git push, an unsigned ZIP, a signed Firefox XP
 2. Run `pnpm install --frozen-lockfile`, `pnpm run build:vendor`, `python3 -m unittest discover -s tests -p 'test_*.py'`, and `python3 scripts/package_extension.py`.
 3. Unpack `dist/localvert-0.2.0.zip` into a temporary directory and run `pnpm exec web-ext lint --source-dir <directory>`. Lint the package, not the repository, so development scripts are excluded.
 4. Run the browser regression page with fresh local fixtures; test an installed extension in each target browser. Check a disconnected/offline run, downloads, the optional upload-field action, clipboard paste, PDF page tools, dark/light mode, and large/corrupt inputs. Record browser versions and pass/fail results before submission.
-5. Review `PRIVACY.md`, permissions, bundled library licenses, store screenshots, and the public privacy-policy URL. The GitHub repository is private, so its current `PRIVACY.md` is **not** a public URL.
+5. Review `PRIVACY.md`, permissions, bundled library licenses, store screenshots, and the public privacy-policy URL. The public GitHub copy of `PRIVACY.md` can be linked, but store-specific requirements still need review.
 
 ## Browser packages
 

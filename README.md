@@ -4,7 +4,7 @@ Dateien direkt im Browser konvertieren und verkleinern: Bilder, PDFs, Office-Dat
 
 ## Testversion installieren
 
-Lade unter **[Releases](https://github.com/reathloo/localVert/releases)** die Datei `localvert-0.2.0.zip` herunter und entpacke sie. Das Repository ist privat: Du brauchst vorher eine Einladung zum Repository.
+Lade unter **[Releases](https://github.com/reathloo/localVert/releases)** die Datei `localvert-0.2.0.zip` herunter und entpacke sie.
 
 - **Chrome:** `chrome://extensions` öffnen, „Entwicklermodus“ aktivieren, „Entpackte Erweiterung laden“ wählen und den entpackten Ordner mit `manifest.json` auswählen.
 - **Edge:** Dasselbe unter `edge://extensions` tun.
