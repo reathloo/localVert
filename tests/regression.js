@@ -9,6 +9,8 @@ import { fillUploadField } from '../src/upload-field.js';
 import { installFileDrop } from '../src/file-drop.js';
 import { imageFromPaste } from '../src/clipboard-image.js';
 import { editPdfPages, inspectPdfPages, mergePdfs } from '../src/pdf-pages.js';
+import { createSeekableBlob } from '../src/seekable-blob.js';
+import { MAX_FILE_SIZE, MAX_MEDIA_FILE_SIZE, MAX_PDF_PAGES } from '../src/limits.js';
 
 const output = document.querySelector('#results');
 const assert = (condition, message) => { if (!condition) throw new Error(message); };
@@ -63,6 +65,28 @@ async function run(files) {
   await check('File detection works without MIME type or extension', async () => {
     const normalized = await validateFile(new File([png], 'image-no-extension', { type: '' }));
     assert(normalized.type === 'image/png' && normalized.size === png.size, 'Incorrect normalization');
+  });
+  await check('Larger files use type-specific local limits', async () => {
+    const mock = (size, header, type) => ({ size, type, slice: () => new Blob([header]) });
+    assert((await validateFile(mock(300 * 1024 ** 2, '%PDF-1.7', 'application/pdf'))).size === 300 * 1024 ** 2, 'Large PDF rejected');
+    assert((await validateFile(mock(1500 * 1024 ** 2, '\0\0\0\x18ftypisom', 'video/mp4'))).size === 1500 * 1024 ** 2, 'Large video rejected');
+    for (const [size, header, type] of [[MAX_FILE_SIZE + 1, '%PDF-1.7', 'application/pdf'], [MAX_MEDIA_FILE_SIZE + 1, '\0\0\0\x18ftypisom', 'video/mp4']]) {
+      let rejected = false;
+      try { await validateFile(mock(size, header, type)); } catch { rejected = true; }
+      assert(rejected, `Oversized ${type} accepted`);
+    }
+  });
+  await check('Chunked media output supports header rewrites and size limits', async () => {
+    const sink = createSeekableBlob(8);
+    const writer = sink.writable.getWriter();
+    await writer.write({ position: 0, data: new TextEncoder().encode('abcdef') });
+    await writer.write({ position: 1, data: new TextEncoder().encode('XY') });
+    await writer.close();
+    assert(await sink.blob('video/mp4').text() === 'aXYdef', 'Header rewrite damaged output');
+    const limited = createSeekableBlob(3).writable.getWriter();
+    let rejected = false;
+    try { await limited.write({ position: 0, data: new Uint8Array(4) }); } catch { rejected = true; }
+    assert(rejected, 'Oversized media output accepted');
   });
   await check('Whole-window drop accepts files and ignores text', () => {
     const root = document.createElement('div');
@@ -209,6 +233,23 @@ async function run(files) {
     let rejected = false;
     try { await editPdfPages(source, [{ sourceIndex: 2, rotation: 0 }], signal()); } catch { rejected = true; }
     assert(rejected, 'Invalid page index accepted');
+  });
+  await check('700-page PDF is accepted; 1,001 pages are rejected', async () => {
+    const document = await PDFLib.PDFDocument.create();
+    for (let index = 0; index < 700; index++) document.addPage([72, 72]);
+    const source = new File([await document.save()], 'long.pdf', { type: 'application/pdf' });
+    const pages = await inspectPdfPages(source, signal());
+    assert(pages.length === 700, '700-page PDF was rejected');
+    const result = await compressPdf(source, 80, null, signal(), () => {});
+    assert(result.blob.size > 0, 'Long PDF did not produce a result');
+    const raster = await compressPdf(source, 60, null, signal(), () => {});
+    const rasterDocument = await PDFLib.PDFDocument.load(await raster.blob.arrayBuffer());
+    assert(rasterDocument.getPageCount() === 700, 'Rasterized long PDF lost pages');
+    for (let index = 700; index < MAX_PDF_PAGES + 1; index++) document.addPage([72, 72]);
+    const oversized = new File([await document.save()], 'too-many-pages.pdf', { type: 'application/pdf' });
+    let rejected = false;
+    try { await inspectPdfPages(oversized, signal()); } catch { rejected = true; }
+    assert(rejected, 'PDF over page limit accepted');
   });
   await check('PDF merge preserves pages and originals', async () => {
     const before = await hash(pdf);

@@ -1,8 +1,9 @@
 import { t } from './i18n.js';
+import { MAX_PDF_PAGES, MAX_PDF_OUTPUT_SIZE, MAX_FILE_SIZE } from './limits.js';
 
-const MAX_PAGES = 200;
-const MAX_OUTPUT_SIZE = 200 * 1024 ** 2;
-const MAX_MERGE_INPUT_SIZE = 100 * 1024 ** 2;
+const MAX_PAGES = MAX_PDF_PAGES;
+const MAX_OUTPUT_SIZE = MAX_PDF_OUTPUT_SIZE;
+const MAX_MERGE_INPUT_SIZE = MAX_FILE_SIZE;
 const UNSAFE_CATALOG_KEYS = ['AcroForm', 'Outlines', 'Names', 'Perms', 'OCProperties', 'StructTreeRoot', 'Collection', 'DSS'];
 
 async function loadSafePdf(file, signal) {

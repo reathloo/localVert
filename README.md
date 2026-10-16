@@ -4,7 +4,7 @@ Convert and compress images, PDFs, Office documents, audio, and video right in y
 
 ## Install the test version
 
-Download `localvert-0.2.1.zip` from **[Releases](https://github.com/reathloo/localVert/releases)** and unzip it.
+Download `localvert-0.2.2.zip` from **[Releases](https://github.com/reathloo/localVert/releases)** and unzip it.
 
 - **Chrome:** Open `chrome://extensions`, enable **Developer mode**, click **Load unpacked**, and select the unzipped folder containing `manifest.json`.
 - **Edge:** Follow the same steps at `edge://extensions`.

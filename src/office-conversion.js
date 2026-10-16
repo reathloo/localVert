@@ -1,7 +1,8 @@
 import { t } from './i18n.js';
+import { MAX_PDF_PAGES, MAX_PDF_OUTPUT_SIZE } from './limits.js';
 
 const decoder = new TextDecoder();
-const MAX_ENTRY_SIZE = 25 * 1024 ** 2;
+const MAX_ENTRY_SIZE = 128 * 1024 ** 2;
 const crcTable = Uint32Array.from({ length: 256 }, (_, index) => {
   let value = index;
   for (let bit = 0; bit < 8; bit++) value = (value >>> 1) ^ (value & 1 ? 0xedb88320 : 0);
@@ -96,15 +97,17 @@ export async function docxToText(file, signal) {
   const zip = await officeEntries(file);
   const document = xml(await zip.read('word/document.xml'));
   signal.throwIfAborted();
-  const paragraphs = elements(document, 'p').map((paragraph) => {
+  const paragraphs = [];
+  for (const [index, paragraph] of elements(document, 'p').entries()) {
+    if (index % 500 === 0) { signal.throwIfAborted(); await new Promise((resolve) => setTimeout(resolve, 0)); }
     const chunks = [];
     for (const node of paragraph.getElementsByTagName('*')) {
       if (node.localName === 't') chunks.push(node.textContent);
       else if (node.localName === 'tab') chunks.push('\t');
       else if (node.localName === 'br') chunks.push('\n');
     }
-    return chunks.join('');
-  });
+    paragraphs.push(chunks.join(''));
+  }
   return new Blob([paragraphs.join('\n') + '\n'], { type: 'text/plain' });
 }
 
@@ -118,7 +121,8 @@ export async function xlsxToCsv(file, signal) {
   signal.throwIfAborted();
   const escape = (value) => /[",\r\n]/.test(value) ? `"${value.replaceAll('"', '""')}"` : value;
   const rows = [];
-  for (const row of elements(sheet, 'row')) {
+  for (const [index, row] of elements(sheet, 'row').entries()) {
+    if (index % 500 === 0) { signal.throwIfAborted(); await new Promise((resolve) => setTimeout(resolve, 0)); }
     const values = [];
     for (const cell of elements(row, 'c')) {
       const ref = cell.getAttribute('r')?.match(/^[A-Z]+/i)?.[0]?.toUpperCase();
@@ -141,7 +145,7 @@ export async function pptxToText(file, signal) {
   const zip = await officeEntries(file);
   const slides = zip.names().filter((name) => /^ppt\/slides\/slide\d+\.xml$/.test(name))
     .sort((a, b) => Number(a.match(/slide(\d+)/)[1]) - Number(b.match(/slide(\d+)/)[1]));
-  if (!slides.length || slides.length > 200) throw new Error(t('officeReadError'));
+  if (!slides.length || slides.length > MAX_PDF_PAGES) throw new Error(t('officeReadError'));
   const pages = [];
   for (const name of slides) {
     signal.throwIfAborted();
@@ -165,7 +169,8 @@ export async function officeToPdf(file, signal) {
   const margin = 90;
   const lineHeight = 34;
   const pageHeight = canvas.height - margin;
-  const maxPages = 200;
+  const maxPages = MAX_PDF_PAGES;
+  let embeddedBytes = 0;
   let y = margin;
   const newPage = () => {
     ctx.fillStyle = '#fff';
@@ -177,6 +182,8 @@ export async function officeToPdf(file, signal) {
   const savePage = async () => {
     if (pdf.getPageCount() >= maxPages) throw new Error(t('tooManyPages'));
     const image = await new Promise((resolve, reject) => canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error(t('imageEncodeError'))), 'image/jpeg', .86));
+    embeddedBytes += image.size;
+    if (embeddedBytes > MAX_PDF_OUTPUT_SIZE) throw new Error(t('pdfOutputTooLarge'));
     const embedded = await pdf.embedJpg(await image.arrayBuffer());
     pdf.addPage([595, 842]).drawImage(embedded, { x: 0, y: 0, width: 595, height: 842 });
   };
@@ -201,5 +208,7 @@ export async function officeToPdf(file, signal) {
   await savePage();
   canvas.width = canvas.height = 0;
   signal.throwIfAborted();
-  return new Blob([await pdf.save()], { type: 'application/pdf' });
+  const bytes = await pdf.save();
+  if (bytes.byteLength > MAX_PDF_OUTPUT_SIZE) throw new Error(t('pdfOutputTooLarge'));
+  return new Blob([bytes], { type: 'application/pdf' });
 }

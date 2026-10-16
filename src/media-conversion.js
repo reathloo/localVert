@@ -1,10 +1,13 @@
 import {
-  ALL_FORMATS, BlobSource, BufferTarget, Conversion, Input, Output,
+  ALL_FORMATS, BlobSource, StreamTarget, Conversion, Input, Output,
   Mp3OutputFormat, OggOutputFormat, FlacOutputFormat, WavOutputFormat,
   Mp4OutputFormat, WebMOutputFormat, Quality, canEncodeAudio, canEncodeVideo,
   registerMp3Encoder,
 } from '../vendor/generated/media-vendor.js';
 import { t } from './i18n.js';
+import { createSeekableBlob } from './seekable-blob.js';
+
+const MAX_MEDIA_OUTPUT_SIZE = 1024 ** 3;
 
 const profiles = [
   { audio: 192_000, video: 3_000_000, maxWidth: 1920 },
@@ -33,7 +36,8 @@ export async function convertMedia(file, outputType, strength, signal, onProgres
     if (!(await input.canRead())) throw new Error(t('mediaReadError'));
     const level = strength <= 30 ? 0 : strength <= 65 ? 1 : 2;
     const profile = profiles[level];
-    const target = new BufferTarget();
+    const sink = createSeekableBlob(MAX_MEDIA_OUTPUT_SIZE);
+    const target = new StreamTarget(sink.writable, { chunked: true });
     const outputFormat = {
       'audio/mpeg': Mp3OutputFormat,
       'audio/ogg': OggOutputFormat,
@@ -66,8 +70,7 @@ export async function convertMedia(file, outputType, strength, signal, onProgres
     try {
       await conversion.execute();
       signal.throwIfAborted();
-      if (!target.buffer) throw new Error(t('mediaReadError'));
-      const blob = new Blob([target.buffer], { type: outputType });
+      const blob = sink.blob(outputType);
       const check = new Input({ source: new BlobSource(blob), formats: ALL_FORMATS });
       try {
         const tracks = outputType.startsWith('video/') ? await check.getVideoTracks() : await check.getAudioTracks();
@@ -78,7 +81,8 @@ export async function convertMedia(file, outputType, strength, signal, onProgres
     } finally { signal.removeEventListener('abort', abort); }
   } catch (error) {
     signal.throwIfAborted();
-    if (error instanceof Error && [t('mediaCodecUnavailable'), t('mediaReadError')].includes(error.message)) throw error;
+    if (error instanceof RangeError && error.message === 'Media output exceeds the local size limit') throw new Error(t('mediaOutputTooLarge'));
+    if (error instanceof Error && [t('mediaCodecUnavailable'), t('mediaReadError'), t('mediaOutputTooLarge')].includes(error.message)) throw error;
     throw new Error(t('mediaReadError'));
   } finally { input.dispose(); }
 }

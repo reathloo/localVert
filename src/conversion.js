@@ -2,15 +2,15 @@ import * as pdfjs from '../vendor/pdfjs/pdf.mjs';
 import { t } from './i18n.js';
 import { officeEntries } from './office-conversion.js';
 import { UTIF } from '../vendor/generated/tiff-vendor.js';
+import { MAX_FILE_SIZE, MAX_MEDIA_FILE_SIZE, MAX_PDF_PAGES, MAX_PDF_OUTPUT_SIZE, MAX_STRUCTURAL_PDF_SIZE, MAX_IMAGE_PIXELS, MAX_IMAGE_SIDE } from './limits.js';
 
 pdfjs.GlobalWorkerOptions.workerSrc = new URL('../vendor/pdfjs/pdf.worker.mjs', import.meta.url).href;
 
-export const MAX_FILE_SIZE = 100 * 1024 ** 2;
+export { MAX_FILE_SIZE } from './limits.js';
 export const MAX_ESTIMATE_SIZE = 30 * 1024 ** 2;
 
 export async function validateFile(file) {
   if (!file.size) throw new Error(t('emptyFile'));
-  if (file.size > MAX_FILE_SIZE) throw new Error(t('fileTooLarge'));
   const bytes = new Uint8Array(await file.slice(0, 1024).arrayBuffer());
   const starts = (...signature) => signature.every((byte, index) => bytes[index] === byte);
   const text = new TextDecoder('latin1').decode(bytes);
@@ -30,6 +30,8 @@ export async function validateFile(file) {
             : text.startsWith('ID3') || (starts(0xff) && (bytes[1] & 0xe0) === 0xe0) ? 'audio/mpeg'
               : starts(0x50, 0x4b, 0x03, 0x04) ? 'office/zip' : null;
   if (!type) throw new Error(t('unsupported'));
+  const limit = type.startsWith('audio/') || type.startsWith('video/') ? MAX_MEDIA_FILE_SIZE : MAX_FILE_SIZE;
+  if (file.size > limit) throw new Error(t('fileTooLarge', { limit: Math.round(limit / 1024 ** 2) }));
   if (type === 'office/zip') {
     const archive = await officeEntries(file);
     const documentType = archive.has('word/document.xml') ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
@@ -98,10 +100,10 @@ export async function compressImage(file, outputType, value, signal, options = {
     if (fixedWidth || fixedHeight) {
       canvas.width = fixedWidth || Math.max(1, Math.round(fixedHeight * logicalWidth / logicalHeight));
       canvas.height = fixedHeight || Math.max(1, Math.round(fixedWidth * logicalHeight / logicalWidth));
-      if (canvas.width > 10000 || canvas.height > 10000 || canvas.width * canvas.height > 20_000_000) throw new Error(t('invalidOutputDimensions'));
+      if (canvas.width > MAX_IMAGE_SIDE || canvas.height > MAX_IMAGE_SIDE || canvas.width * canvas.height > MAX_IMAGE_PIXELS) throw new Error(t('invalidOutputDimensions'));
     } else {
       const maxDimension = Math.min(options.maxDimension || Infinity, value < 35 ? 1800 : value < 70 ? 2400 : 3200);
-      const scale = Math.min(1, maxDimension / Math.max(logicalWidth, logicalHeight), Math.sqrt(20_000_000 / (logicalWidth * logicalHeight))) * pngScale;
+      const scale = Math.min(1, maxDimension / Math.max(logicalWidth, logicalHeight), Math.sqrt(MAX_IMAGE_PIXELS / (logicalWidth * logicalHeight))) * pngScale;
       canvas.width = Math.max(1, Math.round(logicalWidth * scale));
       canvas.height = Math.max(1, Math.round(logicalHeight * scale));
     }
@@ -163,7 +165,7 @@ async function withPdf(file, signal, run) {
       throw new Error(t(error?.name === 'PasswordException' ? 'pdfPassword' : 'pdfReadError'));
     }
     signal.throwIfAborted();
-    if (pdf.numPages > 200) throw new Error(t('tooManyPages'));
+    if (pdf.numPages > MAX_PDF_PAGES) throw new Error(t('tooManyPages'));
     return await run(pdf);
   } finally {
     signal.removeEventListener('abort', abort);
@@ -184,6 +186,7 @@ function profiles(value) {
 
 async function rasterizePdf(source, profile, signal, onProgress = () => {}, pageCount = source.numPages) {
   const output = await globalThis.PDFLib.PDFDocument.create();
+  let embeddedBytes = 0;
   for (let number = 1; number <= pageCount; number += 1) {
     signal.throwIfAborted();
     const page = await source.getPage(number);
@@ -199,6 +202,8 @@ async function rasterizePdf(source, profile, signal, onProgress = () => {}, page
       signal.throwIfAborted();
       const jpeg = await encodeCanvas(canvas, 'image/jpeg', profile.quality);
       signal.throwIfAborted();
+      embeddedBytes += jpeg.size;
+      if (embeddedBytes > MAX_PDF_OUTPUT_SIZE) throw new Error(t('pdfOutputTooLarge'));
       const embedded = await output.embedJpg(await jpeg.arrayBuffer());
       output.addPage([size.width, size.height]).drawImage(embedded, { x: 0, y: 0, width: size.width, height: size.height });
       onProgress('pageProgress', { page: number, total: pageCount });
@@ -211,6 +216,7 @@ async function rasterizePdf(source, profile, signal, onProgress = () => {}, page
   signal.throwIfAborted();
   const bytes = await output.save({ useObjectStreams: true });
   signal.throwIfAborted();
+  if (bytes.byteLength > MAX_PDF_OUTPUT_SIZE) throw new Error(t('pdfOutputTooLarge'));
   return new Blob([bytes], { type: 'application/pdf' });
 }
 
@@ -227,7 +233,7 @@ export function estimatePdf(file, value, signal) {
 
 export async function optimizePdfStructure(file, signal) {
   signal.throwIfAborted();
-  if (file.size > MAX_ESTIMATE_SIZE) return { blob: file, reason: 'pdfLargeKept' };
+  if (file.size > MAX_STRUCTURAL_PDF_SIZE) return { blob: file, reason: 'pdfLargeKept' };
   const bytes = new Uint8Array(await file.arrayBuffer());
   signal.throwIfAborted();
   // Rewriting signed or interactive PDFs can invalidate important features.

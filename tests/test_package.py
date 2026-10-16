@@ -38,6 +38,8 @@ class PackageTests(unittest.TestCase):
                 self.assertIn("src/file-drop.js", names)
                 self.assertIn("src/pdf-pages.js", names)
                 self.assertIn("src/clipboard-image.js", names)
+                self.assertIn("src/limits.js", names)
+                self.assertIn("src/seekable-blob.js", names)
                 self.assertFalse(any(name.startswith(("tests/", "assets/icon-concepts/", "dist/")) for name in names))
                 self.assertEqual(archive.read("manifest.json"), (ROOT / "manifest.json").read_bytes())
                 self.assertEqual(archive.read("LICENSE"), (ROOT / "LICENSE").read_bytes())
@@ -46,7 +48,7 @@ class PackageTests(unittest.TestCase):
                 self.assertEqual(manifest["browser_specific_settings"]["gecko"]["data_collection_permissions"]["required"], ["none"])
                 self.assertEqual(manifest["browser_specific_settings"]["gecko"]["id"], "localvert@reathloo.dev")
                 self.assertEqual(manifest["permissions"], ["activeTab", "scripting"])
-                self.assertEqual(manifest["version"], "0.2.1")
+                self.assertEqual(manifest["version"], "0.2.2")
 
 
 if __name__ == "__main__":

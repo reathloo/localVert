@@ -1,7 +1,8 @@
 // Small ZIP writer for already-compressed local outputs (JPEG/PNG pages).
 import { t } from './i18n.js';
+import { MAX_PDF_PAGES, MAX_ZIP_BYTES } from './limits.js';
 
-export const MAX_ZIP_BYTES = 200 * 1024 ** 2;
+export { MAX_ZIP_BYTES } from './limits.js';
 const table = Uint32Array.from({ length: 256 }, (_, index) => {
   let value = index;
   for (let bit = 0; bit < 8; bit++) value = (value >>> 1) ^ (value & 1 ? 0xedb88320 : 0);
@@ -19,7 +20,7 @@ async function crc32(bytes, signal) {
 }
 
 export async function zipBlobs(entries, signal) {
-  if (entries.length > 200) throw new Error(t('tooManyPages'));
+  if (entries.length > MAX_PDF_PAGES) throw new Error(t('tooManyPages'));
   const encoder = new TextEncoder();
   const parts = [];
   const central = [];

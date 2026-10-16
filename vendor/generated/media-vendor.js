@@ -28663,6 +28663,218 @@ var BufferTarget = class extends Target {
   }
 };
 var DEFAULT_CHUNK_SIZE = 2 ** 24;
+var MAX_CHUNKS_AT_ONCE = 2;
+var StreamTarget = class extends Target {
+  /** Creates a new {@link StreamTarget} which writes to the specified `writable`. */
+  constructor(writable, options = {}) {
+    super();
+    this._sections = [];
+    this._lastWriteEnd = 0;
+    this._lastFlushEnd = 0;
+    this._streamWriter = null;
+    this._writeError = null;
+    this._chunks = [];
+    if (!(writable instanceof WritableStream)) {
+      throw new TypeError("StreamTarget requires a WritableStream instance.");
+    }
+    if (options != null && typeof options !== "object") {
+      throw new TypeError("StreamTarget options, when provided, must be an object.");
+    }
+    if (options.chunked !== void 0 && typeof options.chunked !== "boolean") {
+      throw new TypeError("options.chunked, when provided, must be a boolean.");
+    }
+    if (options.chunkSize !== void 0 && (!Number.isInteger(options.chunkSize) || options.chunkSize < 1024)) {
+      throw new TypeError("options.chunkSize, when provided, must be an integer and not smaller than 1024.");
+    }
+    this._writable = writable;
+    this._options = options;
+    this._chunked = options.chunked ?? false;
+    this._chunkSize = options.chunkSize ?? DEFAULT_CHUNK_SIZE;
+  }
+  /** @internal */
+  _start() {
+    this._streamWriter = this._writable.getWriter();
+  }
+  /** @internal */
+  _write(data, pos) {
+    if (pos > this._lastWriteEnd) {
+      const paddingBytesNeeded = pos - this._lastWriteEnd;
+      this._write(new Uint8Array(paddingBytesNeeded), this._lastWriteEnd);
+    }
+    this._sections.push({
+      data: data.slice(),
+      start: pos
+    });
+    this._lastWriteEnd = Math.max(this._lastWriteEnd, pos + data.byteLength);
+    this._dispatchWrite(pos, pos + data.byteLength);
+  }
+  /** @internal */
+  async _flush() {
+    if (this._writeError !== null) {
+      throw this._writeError;
+    }
+    assert(this._streamWriter);
+    if (this._sections.length === 0) {
+      return;
+    }
+    const chunks = [];
+    const sorted = [...this._sections].sort((a, b) => a.start - b.start);
+    chunks.push({
+      start: sorted[0].start,
+      size: sorted[0].data.byteLength
+    });
+    for (let i = 1; i < sorted.length; i++) {
+      const lastChunk = chunks[chunks.length - 1];
+      const section = sorted[i];
+      if (section.start <= lastChunk.start + lastChunk.size) {
+        lastChunk.size = Math.max(lastChunk.size, section.start + section.data.byteLength - lastChunk.start);
+      } else {
+        chunks.push({
+          start: section.start,
+          size: section.data.byteLength
+        });
+      }
+    }
+    for (const chunk of chunks) {
+      chunk.data = new Uint8Array(chunk.size);
+      for (const section of this._sections) {
+        if (chunk.start <= section.start && section.start < chunk.start + chunk.size) {
+          chunk.data.set(section.data, section.start - chunk.start);
+        }
+      }
+      if (this._streamWriter.desiredSize !== null && this._streamWriter.desiredSize <= 0) {
+        await this._streamWriter.ready;
+      }
+      if (this._chunked) {
+        this._writeDataIntoChunks(chunk.data, chunk.start);
+        this._tryToFlushChunks();
+      } else {
+        if (this._monotonicity === true && chunk.start !== this._lastFlushEnd) {
+          throw new Error("Internal error: Monotonicity violation.");
+        }
+        void this._streamWriter.write({
+          type: "write",
+          data: chunk.data,
+          position: chunk.start
+        }).catch((error) => {
+          this._writeError ??= error;
+        });
+        this._lastFlushEnd = chunk.start + chunk.data.byteLength;
+      }
+    }
+    this._sections.length = 0;
+  }
+  /** @internal */
+  _writeDataIntoChunks(data, position) {
+    let chunkIndex = this._chunks.findIndex((x) => x.start <= position && position < x.start + this._chunkSize);
+    if (chunkIndex === -1)
+      chunkIndex = this._createChunk(position);
+    const chunk = this._chunks[chunkIndex];
+    const relativePosition = position - chunk.start;
+    const toWrite = data.subarray(0, Math.min(this._chunkSize - relativePosition, data.byteLength));
+    chunk.data.set(toWrite, relativePosition);
+    const section = {
+      start: relativePosition,
+      end: relativePosition + toWrite.byteLength
+    };
+    this._insertSectionIntoChunk(chunk, section);
+    if (chunk.written[0].start === 0 && chunk.written[0].end === this._chunkSize) {
+      chunk.shouldFlush = true;
+    }
+    if (this._chunks.length > MAX_CHUNKS_AT_ONCE) {
+      for (let i = 0; i < this._chunks.length - 1; i++) {
+        this._chunks[i].shouldFlush = true;
+      }
+      this._tryToFlushChunks();
+    }
+    if (toWrite.byteLength < data.byteLength) {
+      this._writeDataIntoChunks(data.subarray(toWrite.byteLength), position + toWrite.byteLength);
+    }
+  }
+  /** @internal */
+  _insertSectionIntoChunk(chunk, section) {
+    let low = 0;
+    let high = chunk.written.length - 1;
+    let index = -1;
+    while (low <= high) {
+      const mid = Math.floor(low + (high - low + 1) / 2);
+      if (chunk.written[mid].start <= section.start) {
+        low = mid + 1;
+        index = mid;
+      } else {
+        high = mid - 1;
+      }
+    }
+    chunk.written.splice(index + 1, 0, section);
+    if (index === -1 || chunk.written[index].end < section.start)
+      index++;
+    while (index < chunk.written.length - 1 && chunk.written[index].end >= chunk.written[index + 1].start) {
+      chunk.written[index].end = Math.max(chunk.written[index].end, chunk.written[index + 1].end);
+      chunk.written.splice(index + 1, 1);
+    }
+  }
+  /** @internal */
+  _createChunk(includesPosition) {
+    const start = Math.floor(includesPosition / this._chunkSize) * this._chunkSize;
+    const chunk = {
+      start,
+      data: new Uint8Array(this._chunkSize),
+      written: [],
+      shouldFlush: false
+    };
+    this._chunks.push(chunk);
+    this._chunks.sort((a, b) => a.start - b.start);
+    return this._chunks.indexOf(chunk);
+  }
+  /** @internal */
+  _tryToFlushChunks(force = false) {
+    assert(this._streamWriter);
+    for (let i = 0; i < this._chunks.length; i++) {
+      const chunk = this._chunks[i];
+      if (!chunk.shouldFlush && !force)
+        continue;
+      for (const section of chunk.written) {
+        const position = chunk.start + section.start;
+        if (this._monotonicity === true && position !== this._lastFlushEnd) {
+          throw new Error("Internal error: Monotonicity violation.");
+        }
+        const isPartialView = section.start !== 0 || section.end !== chunk.data.byteLength;
+        let data;
+        if (isPartialView && isWebKit()) {
+          data = chunk.data.slice(section.start, section.end);
+        } else {
+          data = chunk.data.subarray(section.start, section.end);
+        }
+        void this._streamWriter.write({
+          type: "write",
+          data,
+          position
+        }).catch((error) => {
+          this._writeError ??= error;
+        });
+        this._lastFlushEnd = chunk.start + section.end;
+      }
+      this._chunks.splice(i--, 1);
+    }
+  }
+  /** @internal */
+  async _finalize() {
+    if (this._chunked) {
+      this._tryToFlushChunks(true);
+    }
+    if (this._writeError !== null) {
+      throw this._writeError;
+    }
+    assert(this._streamWriter);
+    await this._streamWriter.ready;
+    await this._streamWriter.close();
+    this._emit("finalized");
+  }
+  /** @internal */
+  async _close() {
+    return this._streamWriter?.close();
+  }
+};
 var NullTarget = class extends Target {
   /** @internal */
   _start() {
@@ -36270,7 +36482,6 @@ function assert2(x) {
 export {
   ALL_FORMATS,
   BlobSource,
-  BufferTarget,
   Conversion,
   FlacOutputFormat,
   Input,
@@ -36279,6 +36490,7 @@ export {
   OggOutputFormat,
   Output,
   Quality,
+  StreamTarget,
   WavOutputFormat,
   WebMOutputFormat,
   canEncodeAudio,

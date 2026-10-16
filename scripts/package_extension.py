@@ -18,6 +18,8 @@ REQUIRED_BUNDLES = {
     "src/file-drop.js",
     "src/pdf-pages.js",
     "src/clipboard-image.js",
+    "src/limits.js",
+    "src/seekable-blob.js",
     "vendor/generated/media-vendor.js",
     "vendor/generated/tiff-vendor.js",
     "vendor/generated/media-vendor.js.LEGAL.txt",

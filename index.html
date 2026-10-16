@@ -48,7 +48,12 @@
         <span class="drop-help" data-i18n="orChoose">or click to choose</span>
         <small class="drop-help" data-i18n="supportedFormats">Images, PDF, MP3, WAV, DOCX and XLSX</small>
       </section>
-      <button id="paste-image" class="quiet-action" type="button" data-i18n="pasteImage">Paste image</button>
+      <div class="clipboard-action-row">
+        <button id="paste-image" class="clipboard-action" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="4" width="14" height="18" rx="2"/><path d="M9 4.5V3h6v1.5M8 15l2.5-2.5 2 2L15 12l2 2.5"/></svg>
+          <span data-i18n="pasteImage">Add image from clipboard</span>
+        </button>
+      </div>
       <div id="drop-overlay" class="drop-overlay" aria-hidden="true" hidden>
         <div><svg class="drop-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6M8 15h8m-4-4v8"/></svg><strong data-i18n="dropFilesHere">Drop files anywhere here</strong></div>
       </div>
@@ -75,10 +80,10 @@
           <details id="adjust-options" hidden>
             <summary><span id="adjust-label" data-i18n="imageAdjust">Adjust image</span><span id="adjust-summary" class="adjust-summary" hidden></span></summary>
             <div id="image-controls" class="image-options-grid">
-              <div class="control-group"><label for="max-dimension" data-i18n="maxDimension">Longest edge (px)</label><input id="max-dimension" type="number" min="1" max="10000" placeholder="Auto" data-i18n-placeholder="autoSize"></div>
+              <div class="control-group"><label for="max-dimension" data-i18n="maxDimension">Longest edge (px)</label><input id="max-dimension" type="number" min="1" max="16000" placeholder="Auto" data-i18n-placeholder="autoSize"></div>
               <div class="control-group"><label for="rotation" data-i18n="rotate">Rotate</label><select id="rotation"><option value="0" data-i18n="noRotation">No rotation</option><option value="90">90°</option><option value="180">180°</option><option value="270">270°</option></select></div>
-              <div class="control-group"><label for="output-width" data-i18n="outputWidth">Width (px)</label><input id="output-width" type="number" min="1" max="10000" placeholder="Auto" data-i18n-placeholder="autoSize"></div>
-              <div class="control-group"><label for="output-height" data-i18n="outputHeight">Height (px)</label><input id="output-height" type="number" min="1" max="10000" placeholder="Auto" data-i18n-placeholder="autoSize"></div>
+              <div class="control-group"><label for="output-width" data-i18n="outputWidth">Width (px)</label><input id="output-width" type="number" min="1" max="16000" placeholder="Auto" data-i18n-placeholder="autoSize"></div>
+              <div class="control-group"><label for="output-height" data-i18n="outputHeight">Height (px)</label><input id="output-height" type="number" min="1" max="16000" placeholder="Auto" data-i18n-placeholder="autoSize"></div>
               <small class="field-help image-options-help" data-i18n="dimensionsHelp">One value keeps the aspect ratio; two values add padding if needed.</small>
               <div class="control-group"><label for="square-mode" data-i18n="squareMode">Square</label><select id="square-mode"><option value="none" data-i18n="squareNone">No</option><option value="crop" data-i18n="squareCrop">Crop to square</option><option value="pad" data-i18n="squarePad">Fit without cropping</option></select></div>
               <div class="control-group"><label for="background-color" data-i18n="backgroundColor">Background</label><div class="background-control"><label class="background-toggle"><input id="background-fill" type="checkbox"><span data-i18n="backgroundFill">Fill</span></label><input id="background-color" type="color" value="#ffffff" disabled aria-label="Background color" data-i18n-aria-label="backgroundColor"></div></div>

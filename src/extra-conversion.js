@@ -2,12 +2,14 @@ import * as pdfjs from '../vendor/pdfjs/pdf.mjs';
 import { t } from './i18n.js';
 import { zipBlobs, MAX_ZIP_BYTES } from './zip.js';
 import { imageBitmap } from './conversion.js';
+import { MAX_PDF_PAGES, MAX_PDF_OUTPUT_SIZE } from './limits.js';
 
 // These routes intentionally use only browser APIs and the PDF library already
 // shipped with the extension. No input is sent to a service.
 export async function imagesToPdf(files, strength, signal, onProgress = () => {}) {
   signal.throwIfAborted();
   const output = await PDFLib.PDFDocument.create();
+  let embeddedBytes = 0;
   for (const [index, file] of files.entries()) {
     signal.throwIfAborted();
     const bitmap = await imageBitmap(file);
@@ -24,6 +26,8 @@ export async function imagesToPdf(files, strength, signal, onProgress = () => {}
       context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
       const jpeg = await new Promise((resolve, reject) => canvas.toBlob((blob) => blob?.type === 'image/jpeg' ? resolve(blob) : reject(new Error(t('imageEncodeError'))), 'image/jpeg', (100 - strength) / 100));
       signal.throwIfAborted();
+      embeddedBytes += jpeg.size;
+      if (embeddedBytes > MAX_PDF_OUTPUT_SIZE) throw new Error(t('pdfOutputTooLarge'));
       const embedded = await output.embedJpg(await jpeg.arrayBuffer());
       output.addPage([canvas.width, canvas.height]).drawImage(embedded, { x: 0, y: 0, width: canvas.width, height: canvas.height });
       onProgress('pageProgress', { page: index + 1, total: files.length });
@@ -34,6 +38,7 @@ export async function imagesToPdf(files, strength, signal, onProgress = () => {}
   }
   const bytes = await output.save();
   signal.throwIfAborted();
+  if (bytes.byteLength > MAX_PDF_OUTPUT_SIZE) throw new Error(t('pdfOutputTooLarge'));
   return new Blob([bytes], { type: 'application/pdf' });
 }
 
@@ -54,7 +59,7 @@ export async function pdfToImagesZip(file, type, strength, signal, onProgress = 
   signal.addEventListener('abort', abort, { once: true });
   try {
     const pdf = await task.promise;
-    if (pdf.numPages > 200) throw new Error(t('tooManyPages'));
+    if (pdf.numPages > MAX_PDF_PAGES) throw new Error(t('tooManyPages'));
     const entries = [];
     let totalBytes = 0;
     const imageType = type === 'image/png' ? 'image/png' : 'image/jpeg';
@@ -102,7 +107,7 @@ export async function pdfToText(file, signal, onProgress = () => {}) {
   signal.addEventListener('abort', abort, { once: true });
   try {
     const pdf = await task.promise;
-    if (pdf.numPages > 200) throw Object.assign(new Error(t('tooManyPages')), { code: 'tooManyPages' });
+    if (pdf.numPages > MAX_PDF_PAGES) throw Object.assign(new Error(t('tooManyPages')), { code: 'tooManyPages' });
     const pages = [];
     for (let index = 1; index <= pdf.numPages; index++) {
       signal.throwIfAborted();

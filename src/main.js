@@ -10,6 +10,7 @@ import { fillUploadField } from './upload-field.js';
 import { installFileDrop } from './file-drop.js';
 import { imageFromPaste, readClipboardImage } from './clipboard-image.js';
 import { editPdfPages, inspectPdfPages, mergePdfs } from './pdf-pages.js';
+import { MAX_IMAGE_PIXELS, MAX_IMAGE_SIDE } from './limits.js';
 
 const $ = (id) => document.getElementById(id);
 const quality = $('quality');
@@ -79,8 +80,8 @@ async function checkMediaCapabilities() {
 }
 
 function formatBytes(bytes) {
-  const units = locale === 'fr' ? ['o', 'Ko', 'Mo'] : ['B', 'KB', 'MB'];
-  const index = bytes < 1024 ? 0 : bytes < 1024 ** 2 ? 1 : 2;
+  const units = locale === 'fr' ? ['o', 'Ko', 'Mo', 'Go'] : ['B', 'KB', 'MB', 'GB'];
+  const index = Math.min(3, bytes < 1024 ? 0 : bytes < 1024 ** 2 ? 1 : bytes < 1024 ** 3 ? 2 : 3);
   return `${new Intl.NumberFormat(locale, { maximumFractionDigits: index ? 2 : 0 }).format(bytes / 1024 ** index)} ${units[index]}`;
 }
 
@@ -98,16 +99,16 @@ function settings() {
 function imageOptions() {
   const raw = $('max-dimension').value.trim();
   const maxDimension = raw ? Number(raw) : null;
-  if (raw && (!Number.isInteger(maxDimension) || maxDimension < 1 || maxDimension > 10000)) throw new Error(t('invalidDimension'));
+  if (raw && (!Number.isInteger(maxDimension) || maxDimension < 1 || maxDimension > MAX_IMAGE_SIDE)) throw new Error(t('invalidDimension'));
   const dimension = (id) => {
     const text = $(id).value.trim();
     const value = text ? Number(text) : null;
-    if (text && (!Number.isInteger(value) || value < 1 || value > 10000)) throw new Error(t('invalidOutputDimensions'));
+    if (text && (!Number.isInteger(value) || value < 1 || value > MAX_IMAGE_SIDE)) throw new Error(t('invalidOutputDimensions'));
     return value;
   };
   const width = dimension('output-width');
   const height = dimension('output-height');
-  if (width && height && width * height > 20_000_000) throw new Error(t('invalidOutputDimensions'));
+  if (width && height && width * height > MAX_IMAGE_PIXELS) throw new Error(t('invalidOutputDimensions'));
   if (maxDimension && (width || height)) throw new Error(t('conflictingDimensions'));
   const squareMode = $('square-mode').value;
   if (squareMode !== 'none' && width && height && width !== height) throw new Error(t('invalidSquareDimensions'));
@@ -909,7 +910,8 @@ $('process').addEventListener('click', async () => {
     renderResult();
     $('download').focus({ preventScroll: true });
     try {
-      if ((config.outputType === 'application/pdf' || config.outputType.startsWith('image/')) && (config.isPdf || source.type.startsWith('image/'))) {
+      if ((config.outputType === 'application/pdf' || config.outputType.startsWith('image/')) && (config.isPdf || source.type.startsWith('image/'))
+        && source.size <= MAX_ESTIMATE_SIZE && result.blob.size <= MAX_ESTIMATE_SIZE) {
         const original = config.isPdf ? await pdfPreview(source, controller.signal) : source;
         controller.signal.throwIfAborted();
         const converted = keepOriginal ? original : config.outputType === 'application/pdf' ? await pdfPreview(result.blob, controller.signal) : result.blob;
@@ -920,6 +922,8 @@ $('process').addEventListener('click', async () => {
           $(id).src = url;
         }
         $('preview').hidden = false;
+      } else if ((config.isPdf || source.type.startsWith('image/')) && (source.size > MAX_ESTIMATE_SIZE || result.blob.size > MAX_ESTIMATE_SIZE)) {
+        $('preview-error').hidden = false;
       }
     } catch (error) {
       if (!controller.signal.aborted) $('preview-error').hidden = false;

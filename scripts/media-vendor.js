@@ -1,5 +1,5 @@
 export {
-  ALL_FORMATS, BlobSource, BufferTarget, Conversion, Input, Output,
+  ALL_FORMATS, BlobSource, StreamTarget, Conversion, Input, Output,
   Mp3OutputFormat, OggOutputFormat, FlacOutputFormat, WavOutputFormat,
   Mp4OutputFormat, WebMOutputFormat, Quality, canEncodeAudio, canEncodeVideo,
 } from 'mediabunny';
